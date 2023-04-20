@@ -8,7 +8,7 @@ use std::{
     sync::atomic::AtomicUsize,
 };
 
-use crate::pagecache::{arr_to_u32, u32_to_arr, Heap};
+use crate::{pagecache::{arr_to_u32, u32_to_arr, Heap}};
 use crate::*;
 
 const DEFAULT_PATH: &str = "default.sled";
@@ -373,7 +373,6 @@ impl Config {
         m.flush_every_ms = every_ms;
         self
     }
-
     #[doc(hidden)]
     pub fn idgen_persist_interval(mut self, interval: u64) -> Self {
         if Arc::strong_count(&self.0) != 1 {

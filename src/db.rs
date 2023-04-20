@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::*;
+use crate::{*, hasher::{CHasher, Digest}};
 
 const DEFAULT_TREE_ID: &[u8] = b"__sled__default";
 
@@ -426,7 +426,7 @@ impl Db {
     ///
     /// This is O(N) and locks all underlying Trees
     /// for the duration of the entire scan.
-    pub fn checksum(&self) -> Result<u32> {
+    pub fn checksum(&self) -> Result<Digest> {
         let tenants_mu = self.tenants.write();
 
         // we use a btreemap to ensure lexicographic
@@ -434,7 +434,7 @@ impl Db {
         // checksums.
         let tenants: BTreeMap<_, _> = tenants_mu.iter().collect();
 
-        let mut hasher = crc32fast::Hasher::new();
+        let mut hasher = CHasher::new();
 
         for (name, tree) in &tenants {
             hasher.update(name);

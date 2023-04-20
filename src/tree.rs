@@ -8,7 +8,7 @@ use std::{
 
 use parking_lot::RwLock;
 
-use crate::{atomic_shim::AtomicU64, pagecache::NodeView, *};
+use crate::{atomic_shim::AtomicU64, pagecache::NodeView, *, hasher::{CHasher, Digest}};
 
 #[derive(Debug, Clone)]
 pub(crate) struct View<'g> {
@@ -1421,7 +1421,7 @@ impl Tree {
         while let Some(last) = upper.pop() {
             if last < u8::max_value() {
                 upper.push(last + 1);
-                return self.range(prefix_ref..&upper);
+                return self.range(prefix_ref..upper.as_slice());
             }
         }
 
@@ -1579,8 +1579,10 @@ impl Tree {
     ///
     /// This is O(N) and locks the underlying tree
     /// for the duration of the entire scan.
-    pub fn checksum(&self) -> Result<u32> {
-        let mut hasher = crc32fast::Hasher::new();
+    pub fn checksum(&self) -> Result<Digest> {
+        
+        let mut hasher = CHasher::new();
+
         let mut iter = self.iter();
         while let Some(kv_res) = iter.next_inner() {
             let (k, v) = kv_res?;

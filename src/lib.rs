@@ -215,6 +215,7 @@ mod threadpool;
 pub mod transaction;
 mod tree;
 mod varint;
+mod hasher;
 
 /// Functionality for conditionally triggering failpoints under test.
 #[cfg(feature = "failpoints")]
