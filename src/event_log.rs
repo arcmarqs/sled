@@ -96,7 +96,7 @@ impl EventLog {
                             .chain(
                                 pages.iter().map(|(pid, _frag_locations)| *pid),
                             )
-                            .collect::<Set<_>>()
+                            .collect::<crate::Link::Set<_>>()
                             .into_iter();
 
                         for pid in pids {

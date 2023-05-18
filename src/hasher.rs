@@ -1,5 +1,5 @@
 use crc32fast;
-use blake3;
+use blake3::{self, Hash};
 
 #[cfg(feature = "crypto-checksum")]
 pub const OUT_LEN: usize = 32;
@@ -7,7 +7,12 @@ pub const OUT_LEN: usize = 32;
 #[cfg(not(feature="crypto-checksum"))]
 pub const OUT_LEN: usize = 4;
 
+#[cfg(not(feature="crypto-checksum"))]
 pub type Digest = [u8;OUT_LEN];
+
+#[cfg(feature = "crypto-checksum")]
+pub type Digest = Hash;
+
 
 pub struct CHasher {
     #[cfg(feature = "crypto-checksum")]

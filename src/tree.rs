@@ -8,7 +8,7 @@ use std::{
 
 use parking_lot::RwLock;
 
-use crate::{atomic_shim::AtomicU64, pagecache::NodeView, *, hasher::{CHasher, Digest}};
+use crate::{atomic_shim::AtomicU64, pagecache::{NodeView, PageView}, *, hasher::{CHasher, Digest}, subscriber::EventType};
 
 #[derive(Debug, Clone)]
 pub(crate) struct View<'g> {
@@ -207,11 +207,11 @@ impl Tree {
         if value == last_value_ivec {
             // NB: always broadcast event
             if let Some(Some(res)) = subscriber_reservation.take() {
-                let event = subscriber::Event::single_update(
+                let event = subscriber::EventType::new_update(Event::single_update(
                     self.clone(),
                     key.as_ref().into(),
                     value,
-                );
+                ));
 
                 res.complete(&event);
             }
@@ -231,21 +231,31 @@ impl Tree {
 
         let link =
             self.context.pagecache.link(pid, node_view.0, frag, guard)?;
+        
+        if let Some(Some(res)) = subscriber_reservation.take() {
+            let node = { let node_ref = link.clone().unwrap();
+                node_ref.as_node().clone()
+            };
+
+            let event = subscriber::EventType::new_node(node);
+            res.complete(&event);
+        }
 
         if link.is_ok() {
             // success
             if let Some(Some(res)) = subscriber_reservation.take() {
-                let event = subscriber::Event::single_update(
+                let event = subscriber::EventType::new_update(Event::single_update(
                     self.clone(),
                     key.as_ref().into(),
                     value,
-                );
+                ));
 
                 res.complete(&event);
             }
 
             Ok(Ok(last_value_ivec))
         } else {
+            
             #[cfg(feature = "metrics")]
             M.tree_looped();
             Ok(Err(Conflict))
@@ -442,9 +452,9 @@ impl Tree {
 
         if let Some(res) = subscriber_reservation.take() {
             if let Some(transaction_batch) = transaction_batch_opt {
-                res.complete(&transaction_batch);
+                res.complete(&EventType::new_update(transaction_batch));
             } else {
-                res.complete(&Event::single_batch(self.clone(), batch));
+                res.complete(&EventType::new_update(Event::single_batch(self.clone(), batch)));
             }
         }
 
@@ -688,11 +698,11 @@ impl Tree {
 
             if link.is_ok() {
                 if let Some(res) = subscriber_reservation.take() {
-                    let event = subscriber::Event::single_update(
+                    let event = subscriber::EventType::new_update(Event::single_update(
                         self.clone(),
                         key.as_ref().into(),
                         new2,
-                    );
+                    ));
 
                     res.complete(&event);
                 }
@@ -1196,11 +1206,11 @@ impl Tree {
 
             if link.is_ok() {
                 if let Some(res) = subscriber_reservation.take() {
-                    let event = subscriber::Event::single_update(
+                    let event = subscriber::EventType::new_update(Event::single_update(
                         self.clone(),
                         key.as_ref().into(),
                         new_opt.clone(),
-                    );
+                    ));
 
                     res.complete(&event);
                 }
@@ -1603,10 +1613,9 @@ impl Tree {
         // split node
         let (mut lhs, rhs) = view.deref().split();
         let rhs_lo = rhs.lo().to_vec();
-
+        let rhs_c = rhs.clone();
         // install right side
         let (rhs_pid, rhs_ptr) = self.context.pagecache.allocate(rhs, guard)?;
-
         // replace node, pointing next to installed right
         lhs.set_next(Some(NonZeroU64::new(rhs_pid).unwrap()));
         let replace_res = self.context.pagecache.replace(
@@ -1615,6 +1624,7 @@ impl Tree {
             &lhs,
             guard,
         )?;
+
         #[cfg(feature = "metrics")]
         M.tree_child_split_attempt();
         if replace_res.is_err() {
@@ -1671,6 +1681,13 @@ impl Tree {
             }
         } else {
             let _ = self.root_hoist(root_pid, rhs_pid, &rhs_lo, guard)?;
+        }
+
+        let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
+
+        if let Some(Some(res)) = subscriber_reservation.take() {
+            let event = subscriber::EventType::new_split(lhs, rhs_c);
+            res.complete(&event);
         }
 
         Ok(())
@@ -1859,7 +1876,7 @@ impl Tree {
 
             if overshot {
                 // merge interfered, reload root and retry
-                log::trace!(
+                trace!(
                     "overshot searching for {:?} on node {:?}",
                     key.as_ref(),
                     view.deref()
@@ -1929,7 +1946,7 @@ impl Tree {
                     // due to the Node::index_next_node method
                     // returning a child that is off-by-one to the
                     // left, always causing an undershoot.
-                    log::trace!(
+                    trace!(
                         "failed to apply parent split of \
                         ({:?}, {}) to parent node {:?}",
                         view.lo(),
@@ -1989,7 +2006,7 @@ impl Tree {
 
             if view.is_index {
                 let next = view.index_next_node(key.as_ref());
-                log::trace!(
+                trace!(
                     "found next {} from node {:?}",
                     next.1,
                     view.deref()
@@ -2020,6 +2037,39 @@ impl Tree {
             cursor,
             key.as_ref(),
         );
+    }
+
+    pub fn view<K>(&self, k: K) where K: AsRef<[u8]> { 
+        let guard  = pin();
+        let v = self.view_for_key(k,&guard);
+
+      
+
+         if let Ok(view) = v {
+            let n = view.deref();
+            let overlay_items = n.overlay.iter().collect::<Vec<_>>();
+            let items = n.iter().map(|(k,v)| (IVec::from(k), v)).collect::<Vec<_>>();
+            
+            let mut bl = blake3::Hasher::default();
+            for (key,value) in overlay_items {
+                bl.update(key);
+
+                if let Some(v) = value {
+                    bl.update(v);
+                }
+            }
+
+            for (k,v) in &items {
+                bl.update(&k);
+                bl.update(*v);
+            }
+
+            println!("page of key is {:?}", view.pid);
+            println!("content: {:?} size : {:?}", n, n.len());
+            println!("total items:{:?} hash: {:?}", &items.len(), bl.finalize().to_string());
+            println!("child size: {:?}", n.children)
+        
+         }
     }
 
     fn cap_merging_child<'g>(
@@ -2181,6 +2231,7 @@ impl Tree {
         // leftmost child.
         let mut cursor_pid =
             parent_view.iter_index_pids().nth(merge_index).unwrap();
+        let mut cursor_view;
 
         // searching for the left sibling to merge the target page into
         loop {
@@ -2191,7 +2242,7 @@ impl Tree {
                 "cursor_pid is {} while looking for left sibling",
                 cursor_pid
             );
-            let cursor_view = if let Some(cursor_view) =
+            cursor_view = if let Some(cursor_view) =
                 self.view_for_pid(cursor_pid, guard)?
             {
                 cursor_view
@@ -2336,6 +2387,18 @@ impl Tree {
                      merge have left their epoch"
                 )
             }
+        }
+
+        // notify merge
+
+        let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
+        if let Some(Some(res)) = subscriber_reservation.take() {
+            let rhs = child_view.deref().clone();
+            let parent = Some(parent_view.deref().clone());
+            let lhs = cursor_view.deref().clone();
+            let event = subscriber::EventType::new_merge(lhs , rhs ,parent);
+
+            res.complete(&event);
         }
 
         trace!("finished with merge of pid {}", child_pid);

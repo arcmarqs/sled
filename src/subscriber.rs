@@ -13,6 +13,63 @@ use crate::*;
 
 static ID_GEN: AtomicUsize = AtomicUsize::new(0);
 
+#[derive(Debug, Clone)]
+pub enum EventType {
+    Split { lhs: Arc<Node>, rhs: Arc<Node>},
+    Merge { lhs: Arc<Node>, rhs: Arc<Node>, parent: Option<Arc<Node>>},
+    Node(Arc<Node>),
+    Update(Event)
+}
+
+impl EventType {
+
+    pub fn new_node(node: Node) -> EventType {
+        EventType::Node(Arc::new(node))
+    } 
+
+    pub fn new_split(lhs: Node, rhs: Node) -> EventType {
+        EventType::Split {lhs: Arc::new(lhs), rhs: Arc::new(rhs)}
+    }
+
+    pub fn new_merge(lhs: Node, rhs: Node, parent: Option<Node>) -> EventType {
+        let parent_ref = if let Some(parent) = parent {
+            Some(Arc::new(parent))
+        } else {
+            None
+        };
+
+        EventType::Merge {lhs: Arc::new(lhs), rhs: Arc::new(rhs), parent: parent_ref}
+    }
+
+    pub fn new_update(event : Event) -> EventType {
+        EventType::Update(event)
+    }
+
+    pub fn regular_event(self) -> Option<Event> {
+        if let Self::Update(event) = self {
+           Some(event)
+        } else {
+            None
+        }
+    }
+}
+/* 
+// What happened to the node
+#[derive(Debug,Clone)]
+pub enum NodeContext {
+    Created,
+    Deleted,
+    Split,
+    Merged,
+}
+
+#[derive(Debug,Clone)]
+pub struct NodeEvent {
+    pub(crate) node: Arc<Node>,
+    pub(crate) context: NodeContext,
+    pub(crate) pid: usize,
+}
+*/
 /// An event that happened to a key that a subscriber is interested in.
 #[derive(Debug, Clone)]
 pub struct Event {
@@ -61,7 +118,7 @@ impl<'a> IntoIterator for &'a Event {
     }
 }
 
-type Senders = Map<usize, (Option<Waker>, SyncSender<OneShot<Option<Event>>>)>;
+type Senders = Map<usize, (Option<Waker>, SyncSender<OneShot<Option<EventType>>>)>;
 
 /// A subscriber listening on a specified prefix
 ///
@@ -112,8 +169,8 @@ type Senders = Map<usize, (Option<Waker>, SyncSender<OneShot<Option<Event>>>)>;
 /// `while let Some(event) = (&mut subscriber).await { /* use it */ }`
 pub struct Subscriber {
     id: usize,
-    rx: Receiver<OneShot<Option<Event>>>,
-    existing: Option<OneShot<Option<Event>>>,
+    rx: Receiver<OneShot<Option<EventType>>>,
+    existing: Option<OneShot<Option<EventType>>>,
     home: Arc<RwLock<Senders>>,
 }
 
@@ -131,7 +188,7 @@ impl Subscriber {
     pub fn next_timeout(
         &mut self,
         mut timeout: Duration,
-    ) -> std::result::Result<Event, std::sync::mpsc::RecvTimeoutError> {
+    ) -> std::result::Result<EventType, std::sync::mpsc::RecvTimeoutError> {
         loop {
             let before_first_receive = Instant::now();
             let mut future_rx = if let Some(future_rx) = self.existing.take() {
@@ -160,7 +217,7 @@ impl Subscriber {
 }
 
 impl Future for Subscriber {
-    type Output = Option<Event>;
+    type Output = Option<EventType>;
 
     fn poll(
         mut self: Pin<&mut Self>,
@@ -196,9 +253,9 @@ impl Future for Subscriber {
 }
 
 impl Iterator for Subscriber {
-    type Item = Event;
+    type Item = EventType;
 
-    fn next(&mut self) -> Option<Event> {
+    fn next(&mut self) -> Option<EventType> {
         loop {
             let future_rx = self.rx.recv().ok()?;
             match future_rx.wait() {
@@ -338,11 +395,11 @@ impl Subscribers {
 }
 
 pub(crate) struct ReservedBroadcast {
-    subscribers: Vec<(Option<Waker>, OneShotFiller<Option<Event>>)>,
+    subscribers: Vec<(Option<Waker>, OneShotFiller<Option<EventType>>)>,
 }
 
 impl ReservedBroadcast {
-    pub fn complete(self, event: &Event) {
+    pub fn complete(self, event: &EventType) {
         let iter = self.subscribers.into_iter();
 
         for (waker_opt, tx) in iter {

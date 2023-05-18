@@ -882,11 +882,13 @@ fn tree_subscribers_and_keyspaces() -> Result<()> {
     let t2 = db.open_tree(b"2")?;
     let mut s2 = t2.watch_prefix(b"");
 
+
     t1.insert(b"t1_a", b"t1_a".to_vec())?;
     t2.insert(b"t2_a", b"t2_a".to_vec())?;
 
-    assert_eq!(s1.next().unwrap().iter().next().unwrap().1, b"t1_a");
-    assert_eq!(s2.next().unwrap().iter().next().unwrap().1, b"t2_a");
+ 
+    assert_eq!(s1.next().unwrap().regular_event().unwrap().iter().next().unwrap().1, b"t1_a");
+    assert_eq!(s2.next().unwrap().regular_event().unwrap().iter().next().unwrap().1, b"t2_a");
 
     let guard = pin();
     guard.flush();
@@ -911,8 +913,8 @@ fn tree_subscribers_and_keyspaces() -> Result<()> {
     t1.insert(b"t1_b", b"t1_b".to_vec())?;
     t2.insert(b"t2_b", b"t2_b".to_vec())?;
 
-    assert_eq!(s1.next().unwrap().iter().next().unwrap().1, b"t1_b");
-    assert_eq!(s2.next().unwrap().iter().next().unwrap().1, b"t2_b");
+    assert_eq!(s1.next().unwrap().regular_event().unwrap().iter().next().unwrap().1, b"t1_b");
+    assert_eq!(s2.next().unwrap().regular_event().unwrap().iter().next().unwrap().1, b"t2_b");
 
     let guard = pin();
     guard.flush();

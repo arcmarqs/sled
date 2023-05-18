@@ -153,7 +153,7 @@ fn shared_distance(base: &[u8], search: &[u8]) -> usize {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum KeyRef<'a> {
+pub enum KeyRef<'a> {
     // used when all keys on a node are linear
     // with a fixed stride length, allowing us to
     // avoid ever actually storing any of them
@@ -366,7 +366,7 @@ impl PartialEq<[u8]> for KeyRef<'_> {
     }
 }
 
-struct Iter<'a> {
+pub struct Iter<'a> {
     overlay: std::iter::Skip<im::ordmap::Iter<'a, IVec, Option<IVec>>>,
     node: &'a Inner,
     node_position: usize,
@@ -567,7 +567,7 @@ impl Deref for Node {
 }
 
 impl Node {
-    fn iter(&self) -> Iter<'_> {
+    pub fn iter(&self) -> Iter<'_> {
         Iter {
             overlay: self.overlay.iter().skip(0),
             node: &self.inner,

@@ -389,7 +389,7 @@ impl Page {
         }
     }
 
-    fn as_node(&self) -> &Node {
+    pub fn as_node(&self) -> &Node {
         self.update.as_ref().unwrap().as_node()
     }
 

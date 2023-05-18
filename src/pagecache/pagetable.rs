@@ -122,12 +122,12 @@ impl PageTable {
     ) -> PageView<'g> {
         debug_delay();
         let tip = self.traverse(pid, guard);
-
+       
         let shared = Owned::new(item).into_shared(guard);
         let old = tip.swap(shared, Release, guard);
         assert!(old.is_null());
 
-        PageView { read: shared, entry: tip }
+       PageView { read: shared, entry: tip }
     }
 
     /// Try to get a value from the tree.

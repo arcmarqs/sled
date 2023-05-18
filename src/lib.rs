@@ -281,9 +281,10 @@ pub use self::{
     iter::Iter,
     ivec::IVec,
     result::{Error, Result},
-    subscriber::{Event, Subscriber},
+    subscriber::{Event, Subscriber, EventType},
     transaction::Transactional,
     tree::{CompareAndSwapError, Tree},
+    node::Node,
 };
 
 #[cfg(feature = "metrics")]
@@ -306,7 +307,6 @@ use {
         fastcmp::fastcmp,
         lru::Lru,
         meta::Meta,
-        node::Node,
         oneshot::{OneShot, OneShotFiller},
         result::CasResult,
         subscriber::Subscribers,
@@ -501,6 +501,7 @@ mod compile_time_assertions {
     #[allow(unreachable_code)]
     const fn _assert_public_types_send_sync() {
         _assert_send::<Subscriber>();
+
 
         _assert_send_sync::<Iter>();
         _assert_send_sync::<Tree>();
