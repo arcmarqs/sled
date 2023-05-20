@@ -549,7 +549,7 @@ pub struct Node {
     // the overlay accumulates new writes and tombstones
     // for deletions that have not yet been merged
     // into the inner backing node
-    pub(crate) overlay: im::OrdMap<IVec, Option<IVec>>,
+    pub overlay: im::OrdMap<IVec, Option<IVec>>,
     pub(crate) inner: Arc<Inner>,
 }
 

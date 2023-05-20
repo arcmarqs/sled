@@ -237,7 +237,7 @@ impl Tree {
                 node_ref.as_node().clone()
             };
 
-            let event = subscriber::EventType::new_node(node);
+            let event = subscriber::EventType::new_node(node, pid, key.as_ref().into(), value.clone());
             res.complete(&event);
         }
 
@@ -1686,7 +1686,7 @@ impl Tree {
         let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
 
         if let Some(Some(res)) = subscriber_reservation.take() {
-            let event = subscriber::EventType::new_split(lhs, rhs_c);
+            let event = subscriber::EventType::new_split(lhs, rhs_c, view.pid, rhs_pid);
             res.complete(&event);
         }
 
@@ -2396,7 +2396,7 @@ impl Tree {
             let rhs = child_view.deref().clone();
             let parent = Some(parent_view.deref().clone());
             let lhs = cursor_view.deref().clone();
-            let event = subscriber::EventType::new_merge(lhs , rhs ,parent);
+            let event = subscriber::EventType::new_merge(lhs , rhs ,parent, cursor_pid, child_pid, parent_view.pid);
 
             res.complete(&event);
         }

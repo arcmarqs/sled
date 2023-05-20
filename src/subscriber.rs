@@ -13,32 +13,95 @@ use crate::*;
 
 static ID_GEN: AtomicUsize = AtomicUsize::new(0);
 
+// What happened to the node
+#[derive(Debug,Clone)]
+pub enum NodeContext {
+    Updated{ 
+        key: IVec,
+        value: Option<IVec>,
+    },
+    Split,
+    Merged,
+    MergeParent,
+}
+
+#[derive(Debug,Clone)]
+pub struct NodeEvent {
+    pub node: Arc<Node>,
+    pub context: NodeContext,
+    pub pid: u64,
+}
+
+
 #[derive(Debug, Clone)]
 pub enum EventType {
-    Split { lhs: Arc<Node>, rhs: Arc<Node>},
-    Merge { lhs: Arc<Node>, rhs: Arc<Node>, parent: Option<Arc<Node>>},
-    Node(Arc<Node>),
+    Split { lhs: NodeEvent, rhs: NodeEvent},
+    Merge { lhs: NodeEvent, rhs: NodeEvent, parent:Option<NodeEvent>},
+    Node(NodeEvent),
     Update(Event)
 }
 
 impl EventType {
-
-    pub fn new_node(node: Node) -> EventType {
-        EventType::Node(Arc::new(node))
-    } 
-
-    pub fn new_split(lhs: Node, rhs: Node) -> EventType {
-        EventType::Split {lhs: Arc::new(lhs), rhs: Arc::new(rhs)}
+    pub fn new_node(node: Node, pid: u64, key: IVec, value: Option<IVec>) -> EventType {
+        EventType::Node( NodeEvent{ 
+            node: Arc::new(node), 
+            pid,
+            context: NodeContext::Updated{key: key, value: value},
+        }
+        )
     }
 
-    pub fn new_merge(lhs: Node, rhs: Node, parent: Option<Node>) -> EventType {
+    pub fn new_split(
+        lhs: Node,
+        rhs: Node,
+        lhs_pid: u64,
+        rhs_pid: u64,
+    ) -> EventType {
+        EventType::Split {
+            lhs: NodeEvent {
+                node: Arc::new(lhs),
+                context: NodeContext::Split,
+                pid: lhs_pid,
+            },
+            rhs: NodeEvent {
+                node: Arc::new(rhs),
+                context: NodeContext::Split,
+                pid: rhs_pid,
+            },
+        }
+    }
+
+    pub fn new_merge(
+        lhs: Node,
+        rhs: Node,
+        parent: Option<Node>,
+        lhs_pid: u64,
+        rhs_pid: u64,
+        parent_pid: u64,
+    ) -> EventType {
         let parent_ref = if let Some(parent) = parent {
-            Some(Arc::new(parent))
+            Some(NodeEvent {
+                node: Arc::new(parent),
+                context: NodeContext::MergeParent,
+                pid: parent_pid,
+            })
         } else {
             None
         };
 
-        EventType::Merge {lhs: Arc::new(lhs), rhs: Arc::new(rhs), parent: parent_ref}
+        EventType::Merge {
+            lhs: NodeEvent {
+                node: Arc::new(lhs),
+                context: NodeContext::Merged,
+                pid: lhs_pid,
+            },
+            rhs: NodeEvent {
+                node: Arc::new(rhs),
+                context: NodeContext::Merged,
+                pid: rhs_pid,
+            },
+            parent: parent_ref,
+        }
     }
 
     pub fn new_update(event : Event) -> EventType {
@@ -53,23 +116,6 @@ impl EventType {
         }
     }
 }
-/* 
-// What happened to the node
-#[derive(Debug,Clone)]
-pub enum NodeContext {
-    Created,
-    Deleted,
-    Split,
-    Merged,
-}
-
-#[derive(Debug,Clone)]
-pub struct NodeEvent {
-    pub(crate) node: Arc<Node>,
-    pub(crate) context: NodeContext,
-    pub(crate) pid: usize,
-}
-*/
 /// An event that happened to a key that a subscriber is interested in.
 #[derive(Debug, Clone)]
 pub struct Event {
