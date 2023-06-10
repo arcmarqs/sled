@@ -2421,7 +2421,7 @@ impl Inner {
         }
     }
 
-    fn prefix_decode(&self, key: KeyRef<'_>) -> IVec {
+    pub(crate) fn prefix_decode(&self, key: KeyRef<'_>) -> IVec {
         match key {
             KeyRef::Slice(s) => prefix::decode(self.prefix(), s),
             KeyRef::Computed { base, distance } => {

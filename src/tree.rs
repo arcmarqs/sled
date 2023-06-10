@@ -1602,6 +1602,19 @@ impl Tree {
         Ok(hasher.finalize())
     }
 
+    pub fn import_node<'g>(&self, pid: PageId, new_node: &Node) {
+        let guard = pin();
+
+        if let Ok(Some(old_view)) = self.view_for_pid(pid, &guard) {
+        let replace_res = self.context.pagecache.replace(
+            pid,
+            old_view.node_view.0,
+            new_node,
+            &guard,
+        );
+    }
+    }
+
     fn split_node<'g>(
         &self,
         view: &View<'g>,
@@ -2039,14 +2052,16 @@ impl Tree {
         );
     }
 
-    pub fn view<K>(&self, k: K) where K: AsRef<[u8]> { 
+    pub fn view<K>(&self, k: K) -> Option<(u64,Node)> 
+    where K: AsRef<[u8]> { 
         let guard  = pin();
         let v = self.view_for_key(k,&guard);
-
+        let mut ret = None;
       
 
          if let Ok(view) = v {
             let n = view.deref();
+            ret =Some((view.pid,n.clone()));
             let overlay_items = n.overlay.iter().collect::<Vec<_>>();
             let items = n.iter().map(|(k,v)| (IVec::from(k), v)).collect::<Vec<_>>();
             
@@ -2063,13 +2078,17 @@ impl Tree {
                 bl.update(&k);
                 bl.update(*v);
             }
-
+             
             println!("page of key is {:?}", view.pid);
             println!("content: {:?} size : {:?}", n, n.len());
             println!("total items:{:?} hash: {:?}", &items.len(), bl.finalize().to_string());
             println!("child size: {:?}", n.children)
-        
+            
          }
+
+         ret
+
+         
     }
 
     fn cap_merging_child<'g>(

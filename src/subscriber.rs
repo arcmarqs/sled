@@ -6,8 +6,10 @@ use std::{
         mpsc::{sync_channel, Receiver, SyncSender, TryRecvError},
     },
     task::{Context, Poll, Waker},
-    time::{Duration, Instant},
+    time::{Duration, Instant}, ops::Deref,
 };
+
+use blake3::Hash;
 
 use crate::*;
 
@@ -30,6 +32,34 @@ pub struct NodeEvent {
     pub node: Arc<Node>,
     pub context: NodeContext,
     pub pid: u64,
+}
+
+impl NodeEvent {
+    fn overlay_items(&self) -> Vec<(&IVec,&Option<IVec>)> {
+        self.node.overlay.iter().collect::<Vec<_>>()
+    }
+
+    fn node_items(&self) -> Vec<(IVec,&[u8])> {
+        self.node.iter().map(|(k,v)| (IVec::from(k), v)).collect::<Vec<_>>()
+    }
+    
+    pub fn hash(&self) -> Hash {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&self.pid.to_be_bytes());
+        for (key,val) in self.overlay_items() {
+            hasher.update(key);
+            if let Some(v) = val {
+                hasher.update(v);
+            }
+        }
+
+        for (key,val) in &self.node_items(){
+            hasher.update(key);
+            hasher.update(*val);
+        }
+
+        hasher.finalize()
+    }
 }
 
 

@@ -1595,6 +1595,19 @@ impl PageCacheInner {
         } // loop
     }
 
+    pub fn replace_page<'g>(&self,
+        pid: PageId,
+        mut old: PageView<'g>,
+        node: Node,
+        is_rewrite: bool,
+        guard: &'g Guard) {
+
+
+            let update = Update::Node(node);
+            let guard = pin();
+            let _ = self.cas_page(pid, old, update, false, &guard);
+        }
+
     /// Retrieve the current meta page
     pub(crate) fn get_meta<'g>(&self, guard: &'g Guard) -> MetaView<'g> {
         trace!("getting page iter for META");
