@@ -389,6 +389,10 @@ impl Page {
         }
     }
 
+    pub fn cache_info(&self) -> Option<&CacheInfo> {
+        self.cache_infos.last()
+    }
+
     pub fn as_node(&self) -> &Node {
         self.update.as_ref().unwrap().as_node()
     }
