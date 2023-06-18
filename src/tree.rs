@@ -205,6 +205,18 @@ impl Tree {
         let last_value_ivec = last_value.map(IVec::from);
 
         if value == last_value_ivec {
+
+            if let Some(Some(res)) = subscriber_reservation.take() {
+               
+                let (ci,node) = { let node_ref = node_view.0;
+                
+                    (node_ref.cache_info().unwrap().clone(),node_ref.as_node().clone())
+                };
+    
+                let event = subscriber::EventType::new_node(node, pid, key.as_ref().into(), value.clone(),ci.lsn,ci.pointer);
+                res.complete(&event);
+            }
+
             // NB: always broadcast event
             if let Some(Some(res)) = subscriber_reservation.take() {
                 let event = subscriber::EventType::new_update(Event::single_update(
@@ -216,15 +228,7 @@ impl Tree {
                 res.complete(&event);
             }
 
-            if let Some(Some(res)) = subscriber_reservation.take() {
-               
-                let node = node_view.deref().clone();
-                let cache = self
-    
-                let event = subscriber::EventType::new_node(node, pid, key.as_ref().into(), value.clone(),ci.lsn,ci.pointer);
-                res.complete(&event);
-            }
-
+          
             // short-circuit a no-op set or delete
             return Ok(Ok(last_value_ivec));
         }
