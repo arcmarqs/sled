@@ -8,7 +8,7 @@ use std::{
 
 use parking_lot::RwLock;
 
-use crate::{atomic_shim::AtomicU64, pagecache::{NodeView, PageView}, *, hasher::{CHasher, Digest}, subscriber::EventType};
+use crate::{atomic_shim::AtomicU64, pagecache::{NodeView, PageView, MessageHeader}, *, hasher::{CHasher, Digest}, subscriber::EventType};
 
 #[derive(Debug, Clone)]
 pub(crate) struct View<'g> {
@@ -205,7 +205,8 @@ impl Tree {
         let last_value_ivec = last_value.map(IVec::from);
 
         if value == last_value_ivec {
-
+            /* 
+            Maybe its better not to stream this update since it didnt change the node.
             if let Some(Some(res)) = subscriber_reservation.take() {
                
                 let (ci,node) = { let node_ref = node_view.0;
@@ -216,6 +217,7 @@ impl Tree {
                 let event = subscriber::EventType::new_node(node, pid, key.as_ref().into(), value.clone(),ci.lsn,ci.pointer);
                 res.complete(&event);
             }
+            */
 
             // NB: always broadcast event
             if let Some(Some(res)) = subscriber_reservation.take() {
@@ -245,17 +247,20 @@ impl Tree {
         let link =
             self.context.pagecache.link(pid, node_view.0, frag, guard)?;
         
-        if let Some(Some(res)) = subscriber_reservation.take() {
-            let (ci,node) = { let node_ref = link.clone().unwrap();
-                
-                (node_ref.cache_info().unwrap().clone(),node_ref.as_node().clone())
-            };
-
-            let event = subscriber::EventType::new_node(node, pid, key.as_ref().into(), value.clone(),ci.lsn,ci.pointer);
-            res.complete(&event);
-        }
+       
 
         if link.is_ok() {
+
+            if let Some(Some(res)) = subscriber_reservation.take() {
+                let (ci,node) = { let node_ref = link.clone().unwrap();
+                    
+                    (node_ref.cache_info().unwrap().clone(),node_ref.as_node().clone())
+                };
+    
+                let event = subscriber::EventType::new_node(node, pid, key.as_ref().into(), value.clone(),ci.lsn,ci.pointer);
+                res.complete(&event);
+            }
+
             // success
             if let Some(Some(res)) = subscriber_reservation.take() {
                 let event = subscriber::EventType::new_update(Event::single_update(
@@ -711,6 +716,17 @@ impl Tree {
                 self.context.pagecache.link(pid, node_view.0, frag, &guard)?;
 
             if link.is_ok() {
+
+                if let Some(res) = subscriber_reservation.take() {
+                    let (ci,node) = { let node_ref = link.clone().unwrap();
+                        
+                        (node_ref.cache_info().unwrap().clone(),node_ref.as_node().clone())
+                    };
+        
+                    let event = subscriber::EventType::new_node(node, pid, key.as_ref().into(), new2.clone(),ci.lsn,ci.pointer);
+                    res.complete(&event);
+                }
+
                 if let Some(res) = subscriber_reservation.take() {
                     let event = subscriber::EventType::new_update(Event::single_update(
                         self.clone(),
@@ -1620,13 +1636,22 @@ impl Tree {
         let guard = pin();
 
         if let Ok(Some(old_view)) = self.view_for_pid(pid, &guard) {
-        let replace_res = self.context.pagecache.replace(
-            pid,
-            old_view.node_view.0,
-            new_node,
-            &guard,
-        );
+            let replace_res = self.context.pagecache.replace(
+                pid,
+                old_view.node_view.0,
+                new_node,
+                &guard,
+            );
+        }
     }
+
+    pub fn export_node(&self, pid: u64) -> Option<Node> {
+        let guard = pin();
+        if let Ok(Some(node)) = self.context.pagecache.get(pid, &guard) {
+            Some(node.0.as_node().clone())
+        } else {
+            None
+        }
     }
 
     fn split_node<'g>(

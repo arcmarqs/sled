@@ -477,14 +477,14 @@ impl Serialize for Node {
         size.serialized_size() + size
     }
 
-    fn serialize_into(&self, buf: &mut &mut [u8]) {
+   fn serialize_into(&self, buf: &mut &mut [u8]) {
         assert!(self.overlay.is_empty());
         self.rss().serialize_into(buf);
         buf[..self.len()].copy_from_slice(self.as_ref());
         scoot(buf, self.len());
     }
 
-    fn deserialize(buf: &mut &[u8]) -> Result<Node> {
+   fn deserialize(buf: &mut &[u8]) -> Result<Node> {
         if buf.is_empty() {
             return Err(Error::corruption(None));
         }

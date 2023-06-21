@@ -205,7 +205,7 @@ mod meta;
 mod metrics;
 mod node;
 mod oneshot;
-mod pagecache;
+pub mod pagecache;
 mod result;
 mod serialization;
 mod stack;
@@ -387,7 +387,7 @@ const fn debug_delay() {}
 /// Link denotes a tree node or its modification fragment such as
 /// key addition or removal.
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) enum Link {
+pub enum Link {
     /// A new value is set for a given key
     Set(IVec, IVec),
     /// The kv pair at a particular index is removed

@@ -284,7 +284,7 @@ impl quickcheck::Arbitrary for CacheInfo {
 /// of which a page consists.
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "testing", derive(PartialEq))]
-pub(in crate::pagecache) enum Update {
+pub enum Update {
     Link(Link),
     Node(Node),
     Free,
@@ -293,7 +293,7 @@ pub(in crate::pagecache) enum Update {
 }
 
 impl Update {
-    fn as_node(&self) -> &Node {
+    pub fn as_node(&self) -> &Node {
         match self {
             Update::Node(node) => node,
             other => panic!("called as_node on non-Node: {:?}", other),
@@ -1655,7 +1655,7 @@ impl PageCacheInner {
     }
 
     /// Try to retrieve a page by its logical ID.
-    pub(crate) fn get<'g>(
+    pub fn get<'g>(
         &self,
         pid: PageId,
         guard: &'g Guard,
@@ -1962,7 +1962,7 @@ impl PageCacheInner {
         Ok(())
     }
 
-    fn pull(&self, pid: PageId, lsn: Lsn, pointer: DiskPtr) -> Result<Update> {
+    pub fn pull(&self, pid: PageId, lsn: Lsn, pointer: DiskPtr) -> Result<Update> {
         use MessageKind::*;
 
         trace!("pulling pid {} lsn {} pointer {} from disk", pid, lsn, pointer);
@@ -2054,6 +2054,62 @@ impl PageCacheInner {
         } else {
             Ok(update)
         }
+    }
+
+    pub fn copy_page(&self, pid: PageId, lsn: Lsn, pointer: DiskPtr) -> Result<(MessageHeader,Vec<u8>)> {
+
+        trace!("copying pid {} lsn {} pointer {} from disk", pid, lsn, pointer);
+
+        let expected_segment_number: SegmentNumber = SegmentNumber(
+            u64::try_from(lsn).unwrap()
+                / u64::try_from(self.config.segment_size).unwrap(),
+        );
+
+        iobuf::make_durable(&self.log.iobufs, lsn)?;
+
+        let (header, bytes) = match self.log.read(pid, lsn, pointer) {
+            Ok(LogRead::Inline(header, buf, _len)) => {
+                assert_eq!(
+                    header.pid, pid,
+                    "expected pid {} on pull of pointer {}, \
+                     but got {} instead",
+                    pid, pointer, header.pid
+                );
+                assert_eq!(
+                    header.segment_number, expected_segment_number,
+                    "expected segment number {:?} on pull of pointer {}, \
+                     but got segment number {:?} instead",
+                    expected_segment_number, pointer, header.segment_number
+                );
+                Ok((header, buf))
+            }
+            Ok(LogRead::Heap(header, buf, _heap_id, _inline_len)) => {
+                assert_eq!(
+                    header.pid, pid,
+                    "expected pid {} on pull of pointer {}, \
+                     but got {} instead",
+                    pid, pointer, header.pid
+                );
+                assert_eq!(
+                    header.segment_number, expected_segment_number,
+                    "expected segment number {:?} on pull of pointer {}, \
+                     but got segment number {:?} instead",
+                    expected_segment_number, pointer, header.segment_number
+                );
+
+                Ok((header, buf))
+            }
+            Ok(other) => {
+                debug!("read unexpected page: {:?}", other);
+                Err(Error::corruption(Some(pointer)))
+            }
+            Err(e) => {
+                debug!("failed to read page: {:?}", e);
+                Err(e)
+            }
+        }?;
+
+        Ok((header,bytes))
     }
 
     fn load_snapshot(&mut self, snapshot: &Snapshot) -> Result<()> {
