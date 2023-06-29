@@ -1632,17 +1632,17 @@ impl Tree {
         Ok(hasher.finalize())
     }
 
-    pub fn import_node<'g>(&self, pid: PageId, new_node: &Node) {
+    pub fn import_node<'g>(&self, pid: PageId, new_node: &Node) -> Result<()> {
         let guard = pin();
 
-        if let Ok(Some(old_view)) = self.view_for_pid(pid, &guard) {
-            let replace_res = self.context.pagecache.replace(
+        Ok(if let Ok(Some(old_view)) = self.view_for_pid(pid, &guard) {
+            let _ = self.context.pagecache.replace(
                 pid,
                 old_view.node_view.0,
                 new_node,
                 &guard,
-            );
-        }
+            )?;
+        })
     }
 
     pub fn export_node(&self, pid: u64) -> Option<Node> {

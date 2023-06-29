@@ -456,6 +456,11 @@ impl Db {
         self.context.pagecache.size_on_disk()
     }
 
+    pub fn take_snapshot(&self) {
+        let pc = self.context.pagecache.clone();
+        threadpool::take_fuzzy_snapshot(pc);
+    }
+
     /// Traverses all files and calculates their total physical
     /// size, then traverses all pages and calculates their
     /// total logical size, then divides the physical size

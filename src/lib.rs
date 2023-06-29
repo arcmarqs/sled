@@ -207,7 +207,7 @@ mod node;
 mod oneshot;
 pub mod pagecache;
 mod result;
-mod serialization;
+pub mod serialization;
 mod stack;
 mod subscriber;
 mod sys_limits;
