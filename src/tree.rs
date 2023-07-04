@@ -8,7 +8,7 @@ use std::{
 
 use parking_lot::RwLock;
 
-use crate::{atomic_shim::AtomicU64, pagecache::{NodeView, PageView, MessageHeader}, *, hasher::{CHasher, Digest}, subscriber::EventType};
+use crate::{atomic_shim::AtomicU64, pagecache::{NodeView, PageView}, *, hasher::{CHasher, Digest}, subscriber::EventType};
 
 #[derive(Debug, Clone)]
 pub(crate) struct View<'g> {
@@ -252,12 +252,12 @@ impl Tree {
         if link.is_ok() {
 
             if let Some(Some(res)) = subscriber_reservation.take() {
-                let (ci,node) = { let node_ref = link.clone().unwrap();
+                let node = { let node_ref = link.clone().unwrap();
                     
-                    (node_ref.cache_info().unwrap().clone(),node_ref.as_node().clone())
+                    node_ref.as_node().clone()
                 };
     
-                let event = subscriber::EventType::new_node(node, pid, key.as_ref().into(), value.clone(),ci.lsn,ci.pointer);
+                let event = subscriber::EventType::new_node(node, pid, key.as_ref().into(), value.clone());
                 res.complete(&event);
             }
 
@@ -718,12 +718,12 @@ impl Tree {
             if link.is_ok() {
 
                 if let Some(res) = subscriber_reservation.take() {
-                    let (ci,node) = { let node_ref = link.clone().unwrap();
+                    let node = { let node_ref: PageView<'_> = link.clone().unwrap();
                         
-                        (node_ref.cache_info().unwrap().clone(),node_ref.as_node().clone())
+                        node_ref.as_node().clone()
                     };
         
-                    let event = subscriber::EventType::new_node(node, pid, key.as_ref().into(), new2.clone(),ci.lsn,ci.pointer);
+                    let event = subscriber::EventType::new_node(node, pid, key.as_ref().into(), new2.clone());
                     res.complete(&event);
                 }
 
@@ -1252,6 +1252,11 @@ impl Tree {
         }
     }
 
+    pub fn take_snapshot(&self) {
+        let pc = self.context.pagecache.clone();
+        threadpool::take_fuzzy_snapshot(pc);
+    }
+
     /// Sets a merge operator for use with the `merge` function.
     ///
     /// Merge state directly into a given key's value using the
@@ -1632,17 +1637,27 @@ impl Tree {
         Ok(hasher.finalize())
     }
 
-    pub fn import_node<'g>(&self, pid: PageId, new_node: &Node) -> Result<()> {
+    pub fn import_node<'g>(&self, pid: PageId, new_node: Node) -> Result<()> {
         let guard = pin();
 
         Ok(if let Ok(Some(old_view)) = self.view_for_pid(pid, &guard) {
             let _ = self.context.pagecache.replace(
                 pid,
                 old_view.node_view.0,
-                new_node,
+                &new_node,
                 &guard,
             )?;
+
+            let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
+
+            if let Some(Some(res)) = subscriber_reservation.take() {
+                let event = subscriber::EventType::imported_node(new_node, pid);
+                res.complete(&event);
+            }
+    
         })
+
+
     }
 
     pub fn export_node(&self, pid: u64) -> Option<Node> {
@@ -1738,8 +1753,7 @@ impl Tree {
         let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
 
         if let Some(Some(res)) = subscriber_reservation.take() {
-            let ci = replace_res.unwrap().cache_info().unwrap().clone();
-            let event = subscriber::EventType::new_split(lhs, rhs_c, view.pid, rhs_pid,ci.lsn,ci.pointer);
+            let event = subscriber::EventType::new_split(lhs, rhs_c, view.pid, rhs_pid);
             res.complete(&event);
         }
 
@@ -2262,7 +2276,6 @@ impl Tree {
             child_pid,
             parent_view.pid
         );
-        let mut page_view = None;
 
         let child_view = if let Some(merging_child) =
             self.cap_merging_child(child_pid, guard)?
@@ -2348,8 +2361,7 @@ impl Tree {
                     guard,
                 )?;
                 match replace {
-                    Ok(rep) => {
-                        page_view = Some(rep.clone());
+                    Ok(_) => {
                         trace!(
                             "merged node pid {} into left sibling pid {}",
                             child_pid,
@@ -2457,8 +2469,7 @@ impl Tree {
             let rhs = child_view.deref().clone();
             let parent = Some(parent_view.deref().clone());
             let lhs = cursor_view.deref().clone();
-            let ci = page_view.unwrap().cache_info().unwrap().clone();
-            let event = subscriber::EventType::new_merge(lhs , rhs ,parent, cursor_pid, child_pid, parent_view.pid,ci.lsn,ci.pointer);
+            let event = subscriber::EventType::new_merge(lhs , rhs ,parent, cursor_pid, child_pid, parent_view.pid);
 
             res.complete(&event);
         }

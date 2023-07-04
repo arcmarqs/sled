@@ -25,14 +25,13 @@ pub enum NodeContext {
     Split,
     Merged,
     MergeParent,
+    Replaced,
 }
 
 #[derive(Debug,Clone)]
 pub struct NodeEvent {
     pub node: Arc<Node>,
     pub context: NodeContext,
-    pub node_lsn: Lsn,
-    pub node_ptr: DiskPtr,
     pub pid: u64,
 }
 
@@ -74,15 +73,17 @@ pub enum EventType {
 }
 
 impl EventType {
-    pub fn new_node(node: Node, pid: u64, key: IVec, value: Option<IVec>, node_lsn: Lsn, node_ptr: DiskPtr) -> EventType {
+    pub fn new_node(node: Node, pid: u64, key: IVec, value: Option<IVec>) -> EventType {
         EventType::Node( NodeEvent{ 
             node: Arc::new(node), 
             pid,
             context: NodeContext::Updated{key: key, value: value},
-            node_lsn,
-            node_ptr,
         }
         )
+    }
+
+    pub fn imported_node(node: Node, pid: u64) -> EventType {
+        EventType::Node( NodeEvent { node: Arc::new(node), pid, context: NodeContext::Replaced})
     }
 
     pub fn new_split(
@@ -90,23 +91,17 @@ impl EventType {
         rhs: Node,
         lhs_pid: u64,
         rhs_pid: u64,
-        node_lsn: Lsn, 
-        node_ptr: DiskPtr
     ) -> EventType {
         EventType::Split {
             lhs: NodeEvent {
                 node: Arc::new(lhs),
                 context: NodeContext::Split,
                 pid: lhs_pid,
-                node_lsn,
-                node_ptr,
             },
             rhs: NodeEvent {
                 node: Arc::new(rhs),
                 context: NodeContext::Split,
                 pid: rhs_pid,
-                node_lsn,
-                node_ptr,
             },
         }
     }
@@ -118,16 +113,12 @@ impl EventType {
         lhs_pid: u64,
         rhs_pid: u64,
         parent_pid: u64,
-        node_lsn: Lsn, 
-        node_ptr: DiskPtr
     ) -> EventType {
         let parent_ref = if let Some(parent) = parent {
             Some(NodeEvent {
                 node: Arc::new(parent),
                 context: NodeContext::MergeParent,
                 pid: parent_pid,
-                node_lsn,
-                node_ptr,
             })
         } else {
             None
@@ -138,15 +129,11 @@ impl EventType {
                 node: Arc::new(lhs),
                 context: NodeContext::Merged,
                 pid: lhs_pid,
-                node_lsn,
-                node_ptr,
             },
             rhs: NodeEvent {
                 node: Arc::new(rhs),
                 context: NodeContext::Merged,
                 pid: rhs_pid,
-                node_lsn,
-                node_ptr,
             },
             parent: parent_ref,
         }
