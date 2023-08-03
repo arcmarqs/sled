@@ -1640,24 +1640,31 @@ impl Tree {
     pub fn import_node<'g>(&self, pid: PageId, new_node: Node) -> Result<()> {
         let guard = pin();
 
-        Ok(if let Ok(Some(old_view)) = self.view_for_pid(pid, &guard) {
-            let _ = self.context.pagecache.replace(
+        if !self.context.pagecache.contains_pid(pid, &guard) {
+           let _ = self.context.pagecache.allocate_with_pid(
                 pid,
-                old_view.node_view.0,
-                &new_node,
+                new_node.clone(),
                 &guard,
             )?;
-
-            let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
-
-            if let Some(Some(res)) = subscriber_reservation.take() {
-                let event = subscriber::EventType::imported_node(new_node, pid);
-                res.complete(&event);
+        } else {
+            if let Ok(Some(old_view)) = self.view_for_pid(pid, &guard) {
+                let _ = self.context.pagecache.replace(
+                    pid,
+                    old_view.node_view.0,
+                    &new_node,
+                    &guard,
+                )?;
             }
-    
-        })
+        }
 
+        let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
 
+        if let Some(Some(res)) = subscriber_reservation.take() {
+            let event = subscriber::EventType::imported_node(new_node, pid);
+            res.complete(&event);
+        }
+
+        Ok(())
     }
 
     pub fn export_node(&self, pid: u64) -> Option<Node> {

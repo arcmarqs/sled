@@ -20,6 +20,12 @@ pub struct Db {
     tenants: Arc<RwLock<FastMap8<IVec, Tree>>>,
 }
 
+impl Default for Db {
+    fn default() -> Self {
+      Config::new().open().unwrap()
+    }
+}
+
 impl Deref for Db {
     type Target = Tree;
 

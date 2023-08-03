@@ -704,6 +704,10 @@ impl PageCache {
         Ok(PageCache(Arc::new(pc)))
     }
 
+    pub(crate) fn contains_pid(&self, pid: PageId, guard: &Guard) -> bool {
+        self.inner.contains_pid(pid, guard)
+    }
+
     /// Try to atomically add a `PageLink` to the page.
     /// Returns `Ok(new_key)` if the operation was successful. Returns
     /// `Err(None)` if the page no longer exists. Returns
@@ -1043,6 +1047,66 @@ impl PageCacheInner {
 
         let new_pointer = self
             .cas_page(pid, page_view, new, false, guard)?
+            .unwrap_or_else(|e| {
+                panic!(
+                    "should always be able to install \
+                     a new page during allocation, but \
+                     failed for pid {}: {:?}",
+                    pid, e
+                )
+            });
+
+        Ok((pid, new_pointer))
+    }
+
+    pub(crate) fn allocate_with_pid<'g>(&self, pid: PageId, node: Node, guard: &Guard) -> Result<()>{
+
+        match self.allocate_with_pid_inner(pid, Update::Node(node), guard) {
+            Ok((alloc_pid,_)) => {
+                assert_eq!(alloc_pid,pid);
+                
+                Ok(())
+            },
+            Err(e) => Err(e),
+        }
+    }
+
+    // similar to allocate but we try to get a specific pid from the free pids list
+    fn allocate_with_pid_inner<'g>(&self, req_pid: PageId, update: Update, guard: &'g Guard) -> Result<(PageId,PageView<'g>)> {
+
+        let free_opt = {
+            let free = self.free.lock();
+            if let Some(pid) = free.get(&req_pid).copied() {
+                Some(pid)
+            } else {
+                None
+            }
+        };
+
+        let (pid, page_view) = if let Some(pid) = free_opt {
+            trace!("re-allocating pid {}", pid);
+
+            let page_view = self.inner.get(pid, guard);
+            assert!(
+                page_view.is_free(),
+                "failed to re-allocate pid {} which \
+                 contained unexpected state {:?}",
+                pid,
+                page_view,
+            );
+            (pid, page_view)
+        } else {
+            println!("allocating pid {} for the first time", req_pid);
+
+            let new_page = Page { update: None, cache_infos: Vec::default() };
+
+            let page_view = self.inner.insert(req_pid, new_page, guard);
+
+            (req_pid, page_view)
+        };
+
+        let new_pointer = self
+            .cas_page(pid, page_view, update, false, guard)?
             .unwrap_or_else(|e| {
                 panic!(
                     "should always be able to install \
@@ -1598,19 +1662,6 @@ impl PageCacheInner {
             } // match cas result
         } // loop
     }
-
-    pub fn replace_page<'g>(&self,
-        pid: PageId,
-        mut old: PageView<'g>,
-        node: Node,
-        is_rewrite: bool,
-        guard: &'g Guard) {
-
-
-            let update = Update::Node(node);
-            let guard = pin();
-            let _ = self.cas_page(pid, old, update, false, &guard);
-        }
 
     /// Retrieve the current meta page
     pub(crate) fn get_meta<'g>(&self, guard: &'g Guard) -> MetaView<'g> {
