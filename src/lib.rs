@@ -281,7 +281,7 @@ pub use self::{
     iter::Iter,
     ivec::IVec,
     result::{Error, Result},
-    subscriber::{Event, Subscriber, EventType, NodeContext},
+    subscriber::{Event, Subscriber, EventType, NodeEvent,NodeContext},
     transaction::Transactional,
     tree::{CompareAndSwapError, Tree},
     node::Node,
