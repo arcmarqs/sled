@@ -252,12 +252,15 @@ impl Tree {
         if link.is_ok() {
 
             if let Some(Some(res)) = subscriber_reservation.take() {
-                let node = { let node_ref = link.clone().unwrap();
+              /*  let node = { let node_ref = link.clone().unwrap();
                     
                     node_ref.as_node().clone()
                 };
+                */
     
-                let event = subscriber::EventType::new_node(node, pid, key.as_ref().into(), value.clone());
+                let event = subscriber::EventType::new_node(
+                   // node, 
+                    pid);
                 res.complete(&event);
             }
 
@@ -718,12 +721,15 @@ impl Tree {
             if link.is_ok() {
 
                 if let Some(res) = subscriber_reservation.take() {
-                    let node = { let node_ref: PageView<'_> = link.clone().unwrap();
+                   /*  let node = { let node_ref: PageView<'_> = link.clone().unwrap();
                         
                         node_ref.as_node().clone()
-                    };
+                    }; 
+                    */
         
-                    let event = subscriber::EventType::new_node(node, pid, key.as_ref().into(), new2.clone());
+                    let event = subscriber::EventType::new_node(
+                        //node, 
+                        pid);
                     res.complete(&event);
                 }
 
@@ -1660,7 +1666,7 @@ impl Tree {
         let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
 
         if let Some(Some(res)) = subscriber_reservation.take() {
-            let event = subscriber::EventType::imported_node(new_node, pid);
+            let event = subscriber::EventType::imported_node(pid);
             res.complete(&event);
         }
 
@@ -1670,7 +1676,8 @@ impl Tree {
     pub fn export_node(&self, pid: u64) -> Option<Node> {
         let guard = pin();
         if let Ok(Some(node)) = self.context.pagecache.get(pid, &guard) {
-            Some(node.0.as_node().clone())
+            let node = node.0.as_node().clone();
+            Some(node)
         } else {
             None
         }
@@ -1687,7 +1694,6 @@ impl Tree {
         // split node
         let (mut lhs, rhs) = view.deref().split();
         let rhs_lo = rhs.lo().to_vec();
-        let rhs_c = rhs.clone();
         // install right side
         let (rhs_pid, rhs_ptr) = self.context.pagecache.allocate(rhs, guard)?;
         // replace node, pointing next to installed right
@@ -1760,7 +1766,11 @@ impl Tree {
         let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
 
         if let Some(Some(res)) = subscriber_reservation.take() {
-            let event = subscriber::EventType::new_split(lhs, rhs_c, view.pid, rhs_pid);
+            let event = subscriber::EventType::new_split(
+                //lhs, 
+                //rhs_c, 
+                view.pid, 
+                rhs_pid);
             res.complete(&event);
         }
 
@@ -2473,10 +2483,16 @@ impl Tree {
 
         let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
         if let Some(Some(res)) = subscriber_reservation.take() {
-            let rhs = child_view.deref().clone();
-            let parent = Some(parent_view.deref().clone());
-            let lhs = cursor_view.deref().clone();
-            let event = subscriber::EventType::new_merge(lhs , rhs ,parent, cursor_pid, child_pid, parent_view.pid);
+            //let rhs = child_view.deref().clone();
+            //let parent = parent_view.deref().clone();
+           // let lhs = cursor_view.deref().clone();
+            let event = subscriber::EventType::new_merge(
+                //lhs , 
+                //rhs ,
+                true, 
+                cursor_pid, 
+                child_pid, 
+                parent_view.pid);
 
             res.complete(&event);
         }

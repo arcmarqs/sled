@@ -567,6 +567,28 @@ impl Deref for Node {
 }
 
 impl Node {
+
+    pub fn hash(&self, pid: u64) -> Vec<u8> {
+        let mut hasher = blake3::Hasher::new();
+
+        hasher.update(&pid.to_be_bytes());
+     
+        for (key,val) in self.overlay.iter() {
+            hasher.update(key);
+            if let Some(v) = val {
+                hasher.update(v);
+            }
+        }
+
+        for (key,val) in self.inner.iter().map(|(k,v)| (IVec::from(k), v)) {
+            hasher.update(&key);
+            hasher.update(val);
+        }
+
+        hasher.finalize().as_bytes().to_vec()
+
+    }
+
     pub fn iter(&self) -> Iter<'_> {
         Iter {
             overlay: self.overlay.iter().skip(0),

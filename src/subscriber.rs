@@ -6,63 +6,57 @@ use std::{
         mpsc::{sync_channel, Receiver, SyncSender, TryRecvError},
     },
     task::{Context, Poll, Waker},
-    time::{Duration, Instant}, ops::Deref,
+    time::{Duration, Instant},
 };
-
-use blake3::Hash;
 
 use crate::*;
 
 static ID_GEN: AtomicUsize = AtomicUsize::new(0);
 
 // What happened to the node
-#[derive(Debug,Clone)]
+#[derive(Debug,Clone, PartialEq, Eq)]
 pub enum NodeContext {
-    Updated{ 
-        key: IVec,
-        value: Option<IVec>,
-    },
+    Updated,
     Split,
     Merged,
     MergeParent,
     Replaced,
 }
 
+impl NodeContext {
+    pub fn not_merged(&self) -> bool {
+        self != &NodeContext::Merged
+    }
+}
+
+
 #[derive(Debug,Clone)]
 pub struct NodeEvent {
-    pub node: Arc<Node>,
+   // pub node: Arc<Node>,
     pub context: NodeContext,
     pub pid: u64,
 }
-
+/* 
 impl NodeEvent {
-    fn overlay_items(&self) -> Vec<(&IVec,&Option<IVec>)> {
-        self.node.overlay.iter().collect::<Vec<_>>()
-    }
-
-    fn node_items(&self) -> Vec<(IVec,&[u8])> {
-        self.node.iter().map(|(k,v)| (IVec::from(k), v)).collect::<Vec<_>>()
-    }
-    
     pub fn hash(&self) -> Hash {
         let mut hasher = blake3::Hasher::new();
         hasher.update(&self.pid.to_be_bytes());
-        for (key,val) in self.overlay_items() {
+        for (key,val) in self.node.overlay.iter() {
             hasher.update(key);
             if let Some(v) = val {
                 hasher.update(v);
             }
         }
 
-        for (key,val) in &self.node_items(){
-            hasher.update(key);
-            hasher.update(*val);
+        for (key,val) in self.node.iter().map(|(k,v)| (IVec::from(k), v)) {
+            hasher.update(&key);
+            hasher.update(val);
         }
 
         hasher.finalize()
-    }
+    }  
 }
-
+*/
 
 #[derive(Debug, Clone)]
 pub enum EventType {
@@ -73,69 +67,67 @@ pub enum EventType {
 }
 
 impl EventType {
-    pub fn new_node(node: Node, pid: u64, key: IVec, value: Option<IVec>) -> EventType {
-        EventType::Node( NodeEvent{ 
-            node: Arc::new(node), 
-            pid,
-            context: NodeContext::Updated{key: key, value: value},
-        }
-        )
+    pub fn new_node(
+        //node: Node, 
+        pid: u64) -> EventType {
+        EventType::Node(NodeEvent {
+             context: NodeContext::Updated,
+             pid: pid,
+        })    
     }
 
-    pub fn imported_node(node: Node, pid: u64) -> EventType {
-        EventType::Node( NodeEvent { node: Arc::new(node), pid, context: NodeContext::Replaced})
+    pub fn imported_node(pid: u64) -> EventType {
+        EventType::Node(NodeEvent {
+            context: NodeContext::Replaced,
+            pid: pid,
+       })    
     }
 
     pub fn new_split(
-        lhs: Node,
-        rhs: Node,
+        //lhs: Node,
+       // rhs: Node,
         lhs_pid: u64,
         rhs_pid: u64,
     ) -> EventType {
         EventType::Split {
             lhs: NodeEvent {
-                node: Arc::new(lhs),
                 context: NodeContext::Split,
                 pid: lhs_pid,
             },
             rhs: NodeEvent {
-                node: Arc::new(rhs),
                 context: NodeContext::Split,
                 pid: rhs_pid,
-            },
+            }
         }
     }
 
     pub fn new_merge(
-        lhs: Node,
-        rhs: Node,
-        parent: Option<Node>,
+       // lhs: Node,
+        //rhs: Node,
+        parent_merged: bool,
         lhs_pid: u64,
         rhs_pid: u64,
         parent_pid: u64,
     ) -> EventType {
-        let parent_ref = if let Some(parent) = parent {
+        let parent_context = if parent_merged {
             Some(NodeEvent {
-                node: Arc::new(parent),
                 context: NodeContext::MergeParent,
                 pid: parent_pid,
-            })
+            },)
         } else {
             None
         };
 
         EventType::Merge {
-            lhs: NodeEvent {
-                node: Arc::new(lhs),
+            lhs:NodeEvent {
                 context: NodeContext::Merged,
                 pid: lhs_pid,
             },
             rhs: NodeEvent {
-                node: Arc::new(rhs),
                 context: NodeContext::Merged,
                 pid: rhs_pid,
             },
-            parent: parent_ref,
+            parent: parent_context,
         }
     }
 
