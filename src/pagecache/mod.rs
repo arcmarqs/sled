@@ -847,12 +847,13 @@ impl PageCache {
 
                     let link_count = self.links.fetch_add(1, Relaxed);
 
-                    if link_count > 0
+                 /*    if link_count > 0
                         && link_count % self.config.snapshot_after_ops == 0
                     {
                         let s2: PageCache = self.clone();
                         threadpool::take_fuzzy_snapshot(s2);
                     }
+                     */
 
                     return Ok(Ok(old));
                 }
@@ -1073,10 +1074,11 @@ impl PageCacheInner {
 
     // similar to allocate but we try to get a specific pid from the free pids list
     fn allocate_with_pid_inner<'g>(&self, req_pid: PageId, update: Update, guard: &'g Guard) -> Result<(PageId,PageView<'g>)> {
-
+        let mut allocation_serializer;
         let free_opt = {
-            let free = self.free.lock();
+            let mut free = self.free.lock();
             if let Some(pid) = free.get(&req_pid).copied() {
+                free.remove(&pid);
                 Some(pid)
             } else {
                 None
@@ -1096,11 +1098,19 @@ impl PageCacheInner {
             );
             (pid, page_view)
         } else {
-            println!("allocating pid {} for the first time", req_pid);
+            allocation_serializer = self.next_pid_to_allocate.lock();
+            let temp = *allocation_serializer;
+            let pid = if temp == req_pid {
+                temp
+            } else {
+                req_pid
+            };
 
+            *allocation_serializer += 1;
+            
             let new_page = Page { update: None, cache_infos: Vec::default() };
-
-            let page_view = self.inner.insert(req_pid, new_page, guard);
+            //self.page_out(vec![req_pid], &guard)?;
+            let page_view = self.inner.insert(pid, new_page, guard);
 
             (req_pid, page_view)
         };
