@@ -516,7 +516,7 @@ impl PageCache {
         // try to pull any existing snapshot off disk, and
         // apply any new data to it to "catch-up" the
         // snapshot before loading it.
-        let snapshot = read_snapshot_or_default(&config)?;
+        let snapshot = Snapshot::default();
 
         config.heap.gc_unknown_items(&snapshot);
 
