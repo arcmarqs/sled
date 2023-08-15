@@ -125,7 +125,7 @@ impl PageTable {
        
         let shared = Owned::new(item).into_shared(guard);
         let old = tip.swap(shared, Release, guard);
-        //assert!(old.is_null());
+        assert!(old.is_null());
 
        PageView { read: shared, entry: tip }
     }

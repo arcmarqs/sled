@@ -68,7 +68,6 @@ pub enum EventType {
 
 impl EventType {
     pub fn new_node(
-        //node: Node, 
         pid: u64) -> EventType {
         EventType::Node(NodeEvent {
              context: NodeContext::Updated,

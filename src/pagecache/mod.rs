@@ -21,7 +21,7 @@ mod reservation;
 mod segment;
 mod snapshot;
 
-use std::{fmt, ops::Deref};
+use std::{fmt, ops::{Deref, DerefMut}};
 
 use crate::*;
 
@@ -395,6 +395,10 @@ impl Page {
 
     pub fn as_node(&self) -> &Node {
         self.update.as_ref().unwrap().as_node()
+    }
+
+    pub fn as_mut_node(&mut self) -> &mut Node {
+        self.update.as_mut().unwrap().as_node_mut()
     }
 
     fn as_meta(&self) -> &Meta {
@@ -1059,76 +1063,7 @@ impl PageCacheInner {
 
         Ok((pid, new_pointer))
     }
-
-    pub(crate) fn allocate_with_pid<'g>(&self, pid: PageId, node: Node, guard: &Guard) -> Result<()>{
-
-        match self.allocate_with_pid_inner(pid, Update::Node(node), guard) {
-            Ok((alloc_pid,_)) => {
-                assert_eq!(alloc_pid,pid);
-                
-                Ok(())
-            },
-            Err(e) => Err(e),
-        }
-    }
-
-    // similar to allocate but we try to get a specific pid from the free pids list
-    fn allocate_with_pid_inner<'g>(&self, req_pid: PageId, update: Update, guard: &'g Guard) -> Result<(PageId,PageView<'g>)> {
-        let mut allocation_serializer;
-        let free_opt = {
-            let mut free = self.free.lock();
-            if let Some(pid) = free.get(&req_pid).copied() {
-                free.remove(&pid);
-                Some(pid)
-            } else {
-                None
-            }
-        };
-
-        let (pid, page_view) = if let Some(pid) = free_opt {
-            trace!("re-allocating pid {}", pid);
-
-            let page_view = self.inner.get(pid, guard);
-            assert!(
-                page_view.is_free(),
-                "failed to re-allocate pid {} which \
-                 contained unexpected state {:?}",
-                pid,
-                page_view,
-            );
-            (pid, page_view)
-        } else {
-            allocation_serializer = self.next_pid_to_allocate.lock();
-            let temp = *allocation_serializer;
-            let pid = if temp == req_pid {
-                temp
-            } else {
-                req_pid
-            };
-
-            *allocation_serializer += 1;
-            
-            let new_page = Page { update: None, cache_infos: Vec::default() };
-            //self.page_out(vec![req_pid], &guard)?;
-            let page_view = self.inner.insert(pid, new_page, guard);
-
-            (req_pid, page_view)
-        };
-
-        let new_pointer = self
-            .cas_page(pid, page_view, update, false, guard)?
-            .unwrap_or_else(|e| {
-                panic!(
-                    "should always be able to install \
-                     a new page during allocation, but \
-                     failed for pid {}: {:?}",
-                    pid, e
-                )
-            });
-
-        Ok((pid, new_pointer))
-    }
-
+    
     /// Attempt to opportunistically rewrite data from a Draining
     /// segment of the file to help with space amplification.
     /// Returns Ok(true) if we had the opportunity to attempt to

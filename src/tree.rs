@@ -258,8 +258,7 @@ impl Tree {
                 };
                 */
     
-                let event = subscriber::EventType::new_node(
-                   // node, 
+                let event = subscriber::EventType::new_node( 
                     pid);
                 res.complete(&event);
             }
@@ -728,7 +727,6 @@ impl Tree {
                     */
         
                     let event = subscriber::EventType::new_node(
-                        //node, 
                         pid);
                     res.complete(&event);
                 }
@@ -1647,11 +1645,12 @@ impl Tree {
         let guard = pin();
 
         if !self.context.pagecache.contains_pid(pid, &guard) {
-           let _ = self.context.pagecache.allocate_with_pid(
-                pid,
+           let alloc_pid = self.context.pagecache.allocate(
                 new_node.clone(),
                 &guard,
             )?;
+
+            assert_eq!(pid,alloc_pid.0);
         } else {
             if let Ok(Some(old_view)) = self.view_for_pid(pid, &guard) {
                 let _ = self.context.pagecache.replace(
@@ -1669,15 +1668,19 @@ impl Tree {
             let event = subscriber::EventType::imported_node(pid);
             res.complete(&event);
         }
-
+        
         Ok(())
     }
 
     pub fn export_node(&self, pid: u64) -> Option<Node> {
         let guard = pin();
         if let Ok(Some(node)) = self.context.pagecache.get(pid, &guard) {
-            let node = node.0.as_node().clone();
-            Some(node)
+            let ret = node.0.as_node().clone();
+
+            // here we replace the old node with a similar node with its overlay merged, this is done to synchronize splits between replicas
+            
+            let _ = self.context.pagecache.replace(pid, node.0, &ret, &guard).expect("failed to replace page");
+            Some(ret)
         } else {
             None
         }
@@ -1770,7 +1773,8 @@ impl Tree {
                 //lhs, 
                 //rhs_c, 
                 view.pid, 
-                rhs_pid);
+                rhs_pid,
+            );
             res.complete(&event);
         }
 
@@ -1973,6 +1977,7 @@ impl Tree {
                 retry!();
             }
 
+
             if undershot {
                 // half-complete split detect & completion
                 let right_sibling = view
@@ -2030,7 +2035,7 @@ impl Tree {
                     // due to the Node::index_next_node method
                     // returning a child that is off-by-one to the
                     // left, always causing an undershoot.
-                    trace!(
+                   trace!(
                         "failed to apply parent split of \
                         ({:?}, {}) to parent node {:?}",
                         view.lo(),
@@ -2121,45 +2126,6 @@ impl Tree {
             cursor,
             key.as_ref(),
         );
-    }
-
-    pub fn view<K>(&self, k: K) -> Option<(u64,Node)> 
-    where K: AsRef<[u8]> { 
-        let guard  = pin();
-        let v = self.view_for_key(k,&guard);
-        let mut ret = None;
-      
-
-         if let Ok(view) = v {
-            let n = view.deref();
-            ret =Some((view.pid,n.clone()));
-            let overlay_items = n.overlay.iter().collect::<Vec<_>>();
-            let items = n.iter().map(|(k,v)| (IVec::from(k), v)).collect::<Vec<_>>();
-            
-            let mut bl = blake3::Hasher::default();
-            for (key,value) in overlay_items {
-                bl.update(key);
-
-                if let Some(v) = value {
-                    bl.update(v);
-                }
-            }
-
-            for (k,v) in &items {
-                bl.update(&k);
-                bl.update(*v);
-            }
-             
-            println!("page of key is {:?}", view.pid);
-            println!("content: {:?} size : {:?}", n, n.len());
-            println!("total items:{:?} hash: {:?}", &items.len(), bl.finalize().to_string());
-            println!("child size: {:?}", n.children)
-            
-         }
-
-         ret
-
-         
     }
 
     fn cap_merging_child<'g>(
