@@ -1645,12 +1645,22 @@ impl Tree {
         let guard = pin();
 
         if !self.context.pagecache.contains_pid(pid, &guard) {
-           let alloc_pid = self.context.pagecache.allocate(
+           let mut alloc_pid = self.context.pagecache.allocate(
                 new_node.clone(),
                 &guard,
             )?;
 
+            if pid != alloc_pid.0 {
+                let _ = self.context.pagecache.free(alloc_pid.0, alloc_pid.1, &guard);
+
+                alloc_pid = self.context.pagecache.allocate(
+                    new_node.clone(),
+                    &guard,
+                )?;
+            }
+
             assert_eq!(pid,alloc_pid.0);
+
         } else {
             if let Ok(Some(old_view)) = self.view_for_pid(pid, &guard) {
                 let _ = self.context.pagecache.replace(
@@ -1662,12 +1672,12 @@ impl Tree {
             }
         }
 
-        let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
+     //   let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
 
-        if let Some(Some(res)) = subscriber_reservation.take() {
-            let event = subscriber::EventType::imported_node(pid);
-            res.complete(&event);
-        }
+    //    if let Some(Some(res)) = subscriber_reservation.take() {
+    //        let event = subscriber::EventType::imported_node(pid);
+     //       res.complete(&event);
+     //   }
         
         Ok(())
     }
