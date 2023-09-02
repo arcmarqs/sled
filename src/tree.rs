@@ -1672,10 +1672,10 @@ impl Tree {
             }
         }
 
-     //   let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
+       // let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
 
-    //    if let Some(Some(res)) = subscriber_reservation.take() {
-    //        let event = subscriber::EventType::imported_node(pid);
+     //   if let Some(Some(res)) = subscriber_reservation.take() {
+     //       let event = subscriber::EventType::imported_node(pid);
      //       res.complete(&event);
      //   }
         
@@ -2459,12 +2459,8 @@ impl Tree {
 
         let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
         if let Some(Some(res)) = subscriber_reservation.take() {
-            //let rhs = child_view.deref().clone();
-            //let parent = parent_view.deref().clone();
-           // let lhs = cursor_view.deref().clone();
+          
             let event = subscriber::EventType::new_merge(
-                //lhs , 
-                //rhs ,
                 true, 
                 cursor_pid, 
                 child_pid, 
@@ -2473,7 +2469,7 @@ impl Tree {
             res.complete(&event);
         }
 
-        trace!("finished with merge of pid {}", child_pid);
+        println!("finished with merge of pid {}", child_pid);
         Ok(())
     }
 

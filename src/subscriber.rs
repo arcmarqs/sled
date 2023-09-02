@@ -29,14 +29,14 @@ impl NodeContext {
     }
 }
 
-
+/* 
 #[derive(Debug,Clone)]
 pub struct NodeEvent {
    // pub node: Arc<Node>,
-    pub context: NodeContext,
-    pub pid: u64,
+    //pub context: NodeContext,
+    pid: u64,
 }
-/* 
+
 impl NodeEvent {
     pub fn hash(&self) -> Hash {
         let mut hasher = blake3::Hasher::new();
@@ -60,26 +60,20 @@ impl NodeEvent {
 
 #[derive(Debug, Clone)]
 pub enum EventType {
-    Split { lhs: NodeEvent, rhs: NodeEvent},
-    Merge { lhs: NodeEvent, rhs: NodeEvent, parent:Option<NodeEvent>},
-    Node(NodeEvent),
+    Split { lhs: u64, rhs: u64},
+    Merge { lhs: u64, rhs: u64, parent:Option<u64>},
+    Node(u64),
     Update(Event)
 }
 
 impl EventType {
     pub fn new_node(
         pid: u64) -> EventType {
-        EventType::Node(NodeEvent {
-             context: NodeContext::Updated,
-             pid: pid,
-        })    
+        EventType::Node(pid)    
     }
 
     pub fn imported_node(pid: u64) -> EventType {
-        EventType::Node(NodeEvent {
-            context: NodeContext::Replaced,
-            pid: pid,
-       })    
+        EventType::Node(pid)    
     }
 
     pub fn new_split(
@@ -89,14 +83,8 @@ impl EventType {
         rhs_pid: u64,
     ) -> EventType {
         EventType::Split {
-            lhs: NodeEvent {
-                context: NodeContext::Split,
-                pid: lhs_pid,
-            },
-            rhs: NodeEvent {
-                context: NodeContext::Split,
-                pid: rhs_pid,
-            }
+            lhs:  lhs_pid,
+            rhs: rhs_pid,
         }
     }
 
@@ -109,23 +97,14 @@ impl EventType {
         parent_pid: u64,
     ) -> EventType {
         let parent_context = if parent_merged {
-            Some(NodeEvent {
-                context: NodeContext::MergeParent,
-                pid: parent_pid,
-            },)
+            Some(parent_pid,)
         } else {
             None
         };
 
         EventType::Merge {
-            lhs:NodeEvent {
-                context: NodeContext::Merged,
-                pid: lhs_pid,
-            },
-            rhs: NodeEvent {
-                context: NodeContext::Merged,
-                pid: rhs_pid,
-            },
+            lhs: lhs_pid,
+            rhs: rhs_pid,
             parent: parent_context,
         }
     }
