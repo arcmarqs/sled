@@ -1672,12 +1672,12 @@ impl Tree {
             }
         }
 
-       // let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
+         let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
 
-     //   if let Some(Some(res)) = subscriber_reservation.take() {
-     //       let event = subscriber::EventType::imported_node(pid);
-     //       res.complete(&event);
-     //   }
+        if let Some(Some(res)) = subscriber_reservation.take() {
+            let event = subscriber::EventType::imported_node(pid);
+            res.complete(&event);
+        }
         
         Ok(())
     }
