@@ -2469,7 +2469,7 @@ impl Tree {
             res.complete(&event);
         }
 
-        println!("finished with merge of pid {}", child_pid);
+        trace!("finished with merge of pid {}", child_pid);
         Ok(())
     }
 
