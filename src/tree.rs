@@ -220,7 +220,7 @@ impl Tree {
             */
 
             // NB: always broadcast event
-            if let Some(Some(res)) = subscriber_reservation.take() {
+          /*   if let Some(Some(res)) = subscriber_reservation.take() {
                 let event = subscriber::EventType::new_update(Event::single_update(
                     self.clone(),
                     key.as_ref().into(),
@@ -228,7 +228,7 @@ impl Tree {
                 ));
 
                 res.complete(&event);
-            }
+            } */
 
           
             // short-circuit a no-op set or delete
@@ -264,7 +264,7 @@ impl Tree {
             }
 
             // success
-            if let Some(Some(res)) = subscriber_reservation.take() {
+           /*  if let Some(Some(res)) = subscriber_reservation.take() {
                 let event = subscriber::EventType::new_update(Event::single_update(
                     self.clone(),
                     key.as_ref().into(),
@@ -272,7 +272,7 @@ impl Tree {
                 ));
 
                 res.complete(&event);
-            }
+            } */
 
             Ok(Ok(last_value_ivec))
         } else {
@@ -470,7 +470,7 @@ impl Tree {
                 }
             }
         }
-
+/* 
         if let Some(res) = subscriber_reservation.take() {
             if let Some(transaction_batch) = transaction_batch_opt {
                 res.complete(&EventType::new_update(transaction_batch));
@@ -478,7 +478,7 @@ impl Tree {
                 res.complete(&EventType::new_update(Event::single_batch(self.clone(), batch)));
             }
         }
-
+        */
         if let Some(peg) = peg_opt {
             // when the peg drops, it ensures all updates
             // written to the log since its creation are
@@ -731,7 +731,7 @@ impl Tree {
                     res.complete(&event);
                 }
 
-                if let Some(res) = subscriber_reservation.take() {
+              /*   if let Some(res) = subscriber_reservation.take() {
                     let event = subscriber::EventType::new_update(Event::single_update(
                         self.clone(),
                         key.as_ref().into(),
@@ -740,6 +740,7 @@ impl Tree {
 
                     res.complete(&event);
                 }
+                */
 
                 return Ok(Ok(()));
             }
@@ -1239,7 +1240,7 @@ impl Tree {
                 self.context.pagecache.link(pid, node_view.0, frag, &guard)?;
 
             if link.is_ok() {
-                if let Some(res) = subscriber_reservation.take() {
+           /*      if let Some(res) = subscriber_reservation.take() {
                     let event = subscriber::EventType::new_update(Event::single_update(
                         self.clone(),
                         key.as_ref().into(),
@@ -1248,7 +1249,7 @@ impl Tree {
 
                     res.complete(&event);
                 }
-
+                */
                 return Ok(Ok(new_opt));
             }
             #[cfg(feature = "metrics")]
