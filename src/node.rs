@@ -861,7 +861,7 @@ impl Node {
 
     pub(crate) fn export(&self) -> Node {
         let inner = self.merge_overlay();
-
+        
         Node{ inner, overlay: Default::default() }
     }
 
