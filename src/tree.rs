@@ -1686,6 +1686,8 @@ impl Tree {
     pub fn export_node<'g>(&self, pid: u64, guard: &'g Guard) -> Option<Node> {
         if let Ok(Some(view)) = self.view_for_pid(pid, &guard) {
             let ret = view.deref().export();
+
+            println!("rewrite {:?} {:?}", pid, ret.rewrite_generations);
             // here we replace the old node with a node with its overlay merged, this is done to synchronize splits between replicas
             // this is similar to the split process but with only one node.
             
