@@ -1229,7 +1229,7 @@ impl Tree {
                 return Ok(Ok(new_opt));
             }
 
-            let mut subscriber_reservation = self.subscribers.reserve(key);
+           // let mut subscriber_reservation = self.subscribers.reserve(key);
 
             let frag = if let Some(ref new) = new_opt {
                 Link::Set(encoded_key, new.clone())
@@ -1685,13 +1685,16 @@ impl Tree {
 
     pub fn export_node(&self, pid: u64) -> Option<Node> {
         let guard = pin();
-        if let Ok(Some(node)) = self.context.pagecache.get(pid, &guard) {
-            let ret = node.0.as_node().clone();
-
-            // here we replace the old node with a similar node with its overlay merged, this is done to synchronize splits between replicas
-            
-            let _ = self.context.pagecache.replace(pid, node.0, &ret, &guard).expect("failed to replace page");
+        if let Ok(Some(node)) = self.view_for_pid(pid, &guard) {
+            let mut ret = node.deref().clone();
+            ret.overlay = node.overlay.clone();
             Some(ret)
+            // here we replace the old node with a similar node with its overlay merged, this is done to synchronize splits between replicas
+           // if let Ok(res) = self.context.pagecache.replace(pid, node.node_view.0, &ret, &guard).expect("failed to replace page") {
+           // } else {
+           //     panic!("node is not guaranteed to be the same");
+          //  }
+           
         } else {
             None
         }
