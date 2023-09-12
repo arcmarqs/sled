@@ -1734,8 +1734,6 @@ impl Tree {
         #[cfg(feature = "metrics")]
         M.tree_child_split_success();
 
-        println!("split node {:?} {:?} at {:?}", &view.pid, &rhs_pid, rhs_lo);
-
         let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
 
         if let Some(Some(res)) = subscriber_reservation.take() {
