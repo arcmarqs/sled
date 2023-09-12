@@ -859,6 +859,12 @@ impl Node {
         ret
     }
 
+    pub(crate) fn export(&self) -> Node {
+        let inner = self.merge_overlay();
+
+        Node{ inner, overlay: Default::default() }
+    }
+
     pub(crate) fn split(&self) -> (Node, Node) {
         let (lhs_inner, rhs_inner) = self.merge_overlay().split();
         let lhs =
