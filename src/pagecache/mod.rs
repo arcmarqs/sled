@@ -1213,7 +1213,7 @@ impl PageCacheInner {
         if let Some((pid_to_clean, segment_to_clean)) =
             self.log.iobufs.segment_cleaner.pop()
         {
-            println!("rewriting page {:?}", pid_to_clean);
+            println!("rewriting page {:?} {:?}", pid_to_clean,segment_to_clean);
             self.rewrite_page(pid_to_clean, Some(segment_to_clean), guard)?;
         }
 

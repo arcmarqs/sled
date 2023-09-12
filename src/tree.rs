@@ -247,8 +247,6 @@ impl Tree {
         let link =
             self.context.pagecache.link(pid, node_view.0, frag, guard)?;
         
-       
-
         if link.is_ok() {
 
             if let Some(Some(res)) = subscriber_reservation.take() {
@@ -453,7 +451,7 @@ impl Tree {
 
         trace!("applying batch {:?}", batch);
 
-        let mut subscriber_reservation = self.subscribers.reserve_batch(&batch);
+        //let mut subscriber_reservation = self.subscribers.reserve_batch(&batch);
 
         for (k, v_opt) in &batch.writes {
             loop {
@@ -1684,9 +1682,11 @@ impl Tree {
     }
 
     pub fn export_node<'g>(&self, pid: u64, guard: &'g Guard) -> Option<Node> {
+        
         if let Ok(Some(view)) = self.view_for_pid(pid, &guard) {
             let ret = view.deref().export();
             
+            self.flush();
             // here we replace the old node with a node with its overlay merged, this is done to synchronize splits between replicas
             // this is similar to the split process but with only one node.
             
@@ -1756,7 +1756,6 @@ impl Tree {
             );
             res.complete(&event);
         }
-
 
         // either install parent split or hoist root
         if let Some(parent_view) = parent_view_opt {
