@@ -1686,14 +1686,14 @@ impl Tree {
     pub fn export_node(&self, pid: u64) -> Option<Node> {
         let guard = pin();
         if let Ok(Some(node)) = self.view_for_pid(pid, &guard) {
-            let mut ret = node.deref().clone();
-            ret.overlay = node.overlay.clone();
-            Some(ret)
+            let ret = node.deref().clone();
             // here we replace the old node with a similar node with its overlay merged, this is done to synchronize splits between replicas
-           // if let Ok(res) = self.context.pagecache.replace(pid, node.node_view.0, &ret, &guard).expect("failed to replace page") {
-           // } else {
-           //     panic!("node is not guaranteed to be the same");
-          //  }
+
+            if let Ok(_res) = self.context.pagecache.replace(pid, node.node_view.0, &ret, &guard).expect("failed to replace page") {
+                Some(ret)
+            } else {
+                panic!("node is not guaranteed to be the same");
+            }
            
         } else {
             None
