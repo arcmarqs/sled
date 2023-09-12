@@ -1690,6 +1690,7 @@ impl Tree {
             // here we replace the old node with a similar node with its overlay merged, this is done to synchronize splits between replicas
 
             if let Ok(_res) = self.context.pagecache.replace(pid, node.node_view.0, &ret, &guard).expect("failed to replace page") {
+                assert!(_res.as_node().overlay.is_empty());
                 Some(ret)
             } else {
                 panic!("node is not guaranteed to be the same");
