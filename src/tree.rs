@@ -1693,7 +1693,7 @@ impl Tree {
                 view.pid,
                 view.node_view.0,
                 &ret,
-                &guard,
+                guard,
             ).expect("failed to replace page");
 
             if let Ok(_) = replace_res {
