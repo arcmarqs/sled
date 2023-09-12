@@ -1685,24 +1685,22 @@ impl Tree {
         
         if let Ok(Some(view)) = self.view_for_pid(pid, &guard) {
             let ret = view.export();
-
-            Some(ret)
-
-
+            
             // here we replace the old node with a node with its overlay merged, this is done to synchronize splits between replicas
             // this is similar to the split process but with only one node.
             
-            /*let replace_res = self.context.pagecache.replace(
+            let replace_res = self.context.pagecache.replace(
                 view.pid,
                 view.node_view.0,
                 &ret,
                 guard,
-            ).expect("failed to replace page");*/
+            ).expect("failed to replace page");
 
-        //    if let Ok(_) = replace_res {
-         //   } else {
-        //        panic!("node is not guaranteed to be the same");
-        //    }
+           if let Ok(_) = replace_res {
+            Some(ret)
+            } else {
+                panic!("node is not guaranteed to be the same");
+            }
            
         } else {
             None
