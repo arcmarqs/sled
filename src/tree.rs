@@ -1683,9 +1683,7 @@ impl Tree {
         Ok(())
     }
 
-    pub fn export_node(&self, pid: u64) -> Option<Node> {
-        self.flush();
-        let guard = pin();
+    pub fn export_node<'g>(&self, pid: u64, guard: &'g Guard) -> Option<Node> {
         if let Ok(Some(view)) = self.view_for_pid(pid, &guard) {
             let ret = view.deref().export();
             // here we replace the old node with a node with its overlay merged, this is done to synchronize splits between replicas
