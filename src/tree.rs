@@ -1734,6 +1734,21 @@ impl Tree {
         #[cfg(feature = "metrics")]
         M.tree_child_split_success();
 
+        println!("split node {:?} {:?} at {:?}", &view.pid, &rhs_pid, rhs_lo);
+
+        let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
+
+        if let Some(Some(res)) = subscriber_reservation.take() {
+            let event = subscriber::EventType::new_split(
+                //lhs, 
+                //rhs_c, 
+                view.pid, 
+                rhs_pid,
+            );
+            res.complete(&event);
+        }
+
+
         // either install parent split or hoist root
         if let Some(parent_view) = parent_view_opt {
             #[cfg(feature = "metrics")]
@@ -1775,18 +1790,6 @@ impl Tree {
             }
         } else {
             let _ = self.root_hoist(root_pid, rhs_pid, &rhs_lo, guard)?;
-        }
-
-        let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
-
-        if let Some(Some(res)) = subscriber_reservation.take() {
-            let event = subscriber::EventType::new_split(
-                //lhs, 
-                //rhs_c, 
-                view.pid, 
-                rhs_pid,
-            );
-            res.complete(&event);
         }
 
         Ok(())
