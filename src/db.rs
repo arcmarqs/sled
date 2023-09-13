@@ -200,7 +200,7 @@ impl Db {
         Ok(true)
     }
 
-    pub fn export_nodes<'g>(
+    pub fn export_node<'g>(
         &self,
         pid: u64,
         guard: &'g Guard,
