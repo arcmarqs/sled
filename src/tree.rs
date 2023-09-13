@@ -1677,36 +1677,34 @@ impl Tree {
             let event = subscriber::EventType::imported_node(pid);
             res.complete(&event);
         }
-        
+
         Ok(())
     }
 
     pub fn export_node<'g>(&self, pid: u64, guard: &'g Guard) -> Option<Node> {
-        
         if let Ok(Some(view)) = self.view_for_pid(pid, &guard) {
+            let ret = view.deref().clone();
 
             if view.overlay.is_empty() {
-               return Some(view.deref().clone())
-            }
-            let ret = view.deref().clone();
-            
-            // here we replace the old node with a node with its overlay merged, this is done to synchronize splits between replicas
-            // this is similar to the split process but with only one node.
-            
-            let replace_res = self.context.pagecache.replace(
-                pid,
-                view.node_view.0,
-                &ret,
-                guard,
-            ).expect("failed to replace page");
-
-           if let Ok(p) = replace_res {
-            assert_eq!(p.as_node(),&ret);
-            Some(ret)
+                return Some(ret);
             } else {
-                panic!("node is not guaranteed to be the same");
+                // here we replace the old node with a node with its overlay
+                // merged, this is done to synchronize splits between replicas
+                // this is similar to the split process but with only one node.
+
+                let replace_res = self
+                    .context
+                    .pagecache
+                    .replace(pid, view.node_view.0, &ret, guard)
+                    .expect("failed to replace page");
+
+                if let Ok(_) = replace_res {
+                    // assert_eq!(p.as_node(),&ret);
+                    Some(ret)
+                } else {
+                    panic!("node is not guaranteed to be the same");
+                }
             }
-           
         } else {
             None
         }
