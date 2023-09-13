@@ -205,15 +205,15 @@ impl Db {
         pid: u64,
         guard: &'g Guard,
     ) -> Option<Node> {
-        let trees = self.tenants.write();
-        let tree = trees.iter().collect::<Vec<_>>();
-        for (_, tree) in tree {
-                if let Ok(Some(view)) = tree.view_for_pid(pid, &guard) {
+       // let trees = self.tenants.write();
+     //   let tree = trees.iter().collect::<Vec<_>>();
+      //  for (_, tree) in tree {
+                if let Ok(Some(view)) = self.view_for_pid(pid, &guard) {
                     let node = view.deref().clone();
 
                     return Some(Node{overlay: node.overlay.clone(), inner: node.inner.clone()});
                 }
-        }
+       // }
 
        None
 }
