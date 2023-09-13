@@ -1683,15 +1683,15 @@ impl Tree {
 
     pub fn export_node<'g>(&self, pid: u64, guard: &'g Guard) -> Option<Node> {
         
-        if let Ok(Some(view)) = self.view_for_pid(pid, &guard) {
+        if let Ok(Some(view)) = self.context.pagecache.get(pid, &guard) {
             let ret = view.export();
             
             // here we replace the old node with a node with its overlay merged, this is done to synchronize splits between replicas
             // this is similar to the split process but with only one node.
             
             let replace_res = self.context.pagecache.replace(
-                view.pid,
-                view.node_view.0,
+                pid,
+                view.0,
                 &ret,
                 guard,
             ).expect("failed to replace page");
