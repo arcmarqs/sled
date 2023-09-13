@@ -550,7 +550,7 @@ pub struct Node {
     // for deletions that have not yet been merged
     // into the inner backing node
     pub overlay: im::OrdMap<IVec, Option<IVec>>,
-    pub(crate) inner: Arc<Inner>,
+    pub inner: Arc<Inner>,
 }
 
 impl Clone for Node {
@@ -2308,7 +2308,7 @@ impl Inner {
         (0..self.children()).map(move |idx| self.index_value(idx))
     }
 
-    fn iter(&self) -> impl Iterator<Item = (KeyRef<'_>, &[u8])> {
+    pub fn iter(&self) -> impl Iterator<Item = (KeyRef<'_>, &[u8])> {
         self.iter_keys().zip(self.iter_values())
     }
 
