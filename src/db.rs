@@ -209,32 +209,10 @@ impl Db {
         let tree = trees.iter().collect::<Vec<_>>();
         for (_, tree) in tree {
                 if let Ok(Some(view)) = tree.view_for_pid(pid, &guard) {
-                    let ret = view.deref().clone();
+                    let node = view.deref().clone();
 
-                    if view.overlay.is_empty() {
-                        return Some(ret);
-                    } else {
-                        // here we replace the old node with a node with its
-                        // overlay merged, this is done
-                        // to synchronize splits between replicas
-                        // this is similar to the split process but with only
-                        // one node.
-
-                        let replace_res = self
-                            .context
-                            .pagecache
-                            .replace(pid, view.node_view.0, &ret, guard)
-                            .expect("failed to replace page");
-
-                        if let Ok(_) = replace_res {
-                            // assert_eq!(p.as_node(),&ret);
-                            return Some(ret);
-                        } else {
-                            panic!("node is not guaranteed to be the same");
-                        }
-                    }
+                    return Some(Node{overlay: node.overlay.clone(), inner: node.inner.clone()});
                 }
-
         }
 
        None
