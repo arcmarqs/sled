@@ -60,7 +60,7 @@ impl NodeEvent {
 
 #[derive(Debug, Clone)]
 pub enum EventType {
-    Split { lhs: u64, rhs: u64},
+    Split { lhs: u64, rhs: u64, parent: u64},
     Merge { lhs: u64, rhs: u64, parent:Option<u64>},
     Node(u64),
     Update(Event)
@@ -81,10 +81,12 @@ impl EventType {
        // rhs: Node,
         lhs_pid: u64,
         rhs_pid: u64,
+        parent: u64,
     ) -> EventType {
         EventType::Split {
             lhs:  lhs_pid,
             rhs: rhs_pid,
+            parent,
         }
     }
 

@@ -205,22 +205,8 @@ impl Tree {
         let last_value_ivec = last_value.map(IVec::from);
 
         if value == last_value_ivec {
-            /* 
-            Maybe its better not to stream this update since it didnt change the node.
-            if let Some(Some(res)) = subscriber_reservation.take() {
-               
-                let (ci,node) = { let node_ref = node_view.0;
-                
-                    (node_ref.cache_info().unwrap().clone(),node_ref.as_node().clone())
-                };
-    
-                let event = subscriber::EventType::new_node(node, pid, key.as_ref().into(), value.clone(),ci.lsn,ci.pointer);
-                res.complete(&event);
-            }
-            */
-
             // NB: always broadcast event
-          /*   if let Some(Some(res)) = subscriber_reservation.take() {
+       /*       if let Some(Some(res)) = subscriber_reservation.take() {
                 let event = subscriber::EventType::new_update(Event::single_update(
                     self.clone(),
                     key.as_ref().into(),
@@ -229,7 +215,6 @@ impl Tree {
 
                 res.complete(&event);
             } */
-
           
             // short-circuit a no-op set or delete
             return Ok(Ok(last_value_ivec));
@@ -249,7 +234,7 @@ impl Tree {
         
         if link.is_ok() {
 
-            if let Some(Some(res)) = subscriber_reservation.take() {
+             if let Some(Some(res)) = subscriber_reservation.take() {
               /*  let node = { let node_ref = link.clone().unwrap();
                     
                     node_ref.as_node().clone()
@@ -260,9 +245,10 @@ impl Tree {
                     pid);
                 res.complete(&event);
             }
+    
 
             // success
-           /*  if let Some(Some(res)) = subscriber_reservation.take() {
+          /*   if let Some(Some(res)) = subscriber_reservation.take() {
                 let event = subscriber::EventType::new_update(Event::single_update(
                     self.clone(),
                     key.as_ref().into(),
@@ -270,7 +256,7 @@ impl Tree {
                 ));
 
                 res.complete(&event);
-            } */
+            }*/ 
 
             Ok(Ok(last_value_ivec))
         } else {
@@ -451,7 +437,7 @@ impl Tree {
 
         trace!("applying batch {:?}", batch);
 
-        //let mut subscriber_reservation = self.subscribers.reserve_batch(&batch);
+     //   let mut subscriber_reservation = self.subscribers.reserve_batch(&batch);
 
         for (k, v_opt) in &batch.writes {
             loop {
@@ -468,15 +454,15 @@ impl Tree {
                 }
             }
         }
-/* 
-        if let Some(res) = subscriber_reservation.take() {
+ 
+      /*  if let Some(res) = subscriber_reservation.take() {
             if let Some(transaction_batch) = transaction_batch_opt {
                 res.complete(&EventType::new_update(transaction_batch));
             } else {
                 res.complete(&EventType::new_update(Event::single_batch(self.clone(), batch)));
             }
-        }
-        */
+        }*/ 
+        
         if let Some(peg) = peg_opt {
             // when the peg drops, it ensures all updates
             // written to the log since its creation are
@@ -717,7 +703,7 @@ impl Tree {
 
             if link.is_ok() {
 
-                if let Some(res) = subscriber_reservation.take() {
+                 if let Some(res) = subscriber_reservation.take() {
                    /*  let node = { let node_ref: PageView<'_> = link.clone().unwrap();
                         
                         node_ref.as_node().clone()
@@ -729,7 +715,8 @@ impl Tree {
                     res.complete(&event);
                 }
 
-              /*   if let Some(res) = subscriber_reservation.take() {
+                /* 
+                 if let Some(res) = subscriber_reservation.take() {
                     let event = subscriber::EventType::new_update(Event::single_update(
                         self.clone(),
                         key.as_ref().into(),
@@ -737,8 +724,8 @@ impl Tree {
                     ));
 
                     res.complete(&event);
-                }
-                */
+                }*/
+                
 
                 return Ok(Ok(()));
             }
@@ -1227,7 +1214,7 @@ impl Tree {
                 return Ok(Ok(new_opt));
             }
 
-           // let mut subscriber_reservation = self.subscribers.reserve(key);
+        let mut subscriber_reservation = self.subscribers.reserve(key);
 
             let frag = if let Some(ref new) = new_opt {
                 Link::Set(encoded_key, new.clone())
@@ -1238,7 +1225,7 @@ impl Tree {
                 self.context.pagecache.link(pid, node_view.0, frag, &guard)?;
 
             if link.is_ok() {
-           /*      if let Some(res) = subscriber_reservation.take() {
+               /*   if let Some(res) = subscriber_reservation.take() {
                     let event = subscriber::EventType::new_update(Event::single_update(
                         self.clone(),
                         key.as_ref().into(),
@@ -1246,8 +1233,20 @@ impl Tree {
                     ));
 
                     res.complete(&event);
-                }
-                */
+                }*/
+
+                if let Some(res) = subscriber_reservation.take() {
+                    /*  let node = { let node_ref = link.clone().unwrap();
+                          
+                          node_ref.as_node().clone()
+                      };
+                      */
+          
+                      let event = subscriber::EventType::new_node( 
+                          pid);
+                      res.complete(&event);
+                  }
+                
                 return Ok(Ok(new_opt));
             }
             #[cfg(feature = "metrics")]
@@ -1671,9 +1670,9 @@ impl Tree {
             }
         }
 
-       //  let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
+       //  let mut subscriber_reservation = self.subscribers.reserve(vec![]);
 
-     //   if let Some(Some(res)) = subscriber_reservation.take() {
+     //   if let Some(res) = subscriber_reservation.take() {
      //       let event = subscriber::EventType::imported_node(pid);
      //       res.complete(&event);
      //   }
@@ -1717,19 +1716,7 @@ impl Tree {
         }
         #[cfg(feature = "metrics")]
         M.tree_child_split_success();
-
-        let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
-
-        if let Some(Some(res)) = subscriber_reservation.take() {
-            let event = subscriber::EventType::new_split(
-                //lhs, 
-                //rhs_c, 
-                view.pid, 
-                rhs_pid,
-            );
-            res.complete(&event);
-        }
-
+        let parent_pid;
         // either install parent split or hoist root
         if let Some(parent_view) = parent_view_opt {
             #[cfg(feature = "metrics")]
@@ -1752,6 +1739,9 @@ impl Tree {
                 &parent,
                 guard,
             )?;
+
+            parent_pid = parent_view.pid;
+
             trace!(
                 "parent_split at {:?} child pid {} \
                 parent pid {} success: {}",
@@ -1771,6 +1761,22 @@ impl Tree {
             }
         } else {
             let _ = self.root_hoist(root_pid, rhs_pid, &rhs_lo, guard)?;
+            parent_pid = root_pid;
+        }
+
+        
+         
+        let mut subscriber_reservation = self.subscribers.reserve(vec![]);
+        
+        if let Some(res) = subscriber_reservation.take() {
+            let event = subscriber::EventType::new_split(
+                //lhs, 
+                //rhs_c, 
+                view.pid, 
+                rhs_pid,
+                parent_pid,
+            );
+            res.complete(&event);
         }
 
         Ok(())
@@ -2441,9 +2447,9 @@ impl Tree {
         }
 
         // notify merge
-
-        let mut subscriber_reservation = Some(self.subscribers.reserve(vec![]));
-        if let Some(Some(res)) = subscriber_reservation.take() {
+ 
+        let mut subscriber_reservation = self.subscribers.reserve(vec![]);
+        if let Some(res) = subscriber_reservation.take() {
           
             let event = subscriber::EventType::new_merge(
                 true, 
@@ -2457,6 +2463,7 @@ impl Tree {
         trace!("finished with merge of pid {}", child_pid);
         Ok(())
     }
+    
 
     #[doc(hidden)]
     pub fn verify_integrity(&self) -> Result<()> {
