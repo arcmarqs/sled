@@ -2312,7 +2312,7 @@ impl Inner {
         self.iter_keys().zip(self.iter_values())
     }
 
-    pub(crate) fn lo(&self) -> &[u8] {
+    pub fn lo(&self) -> &[u8] {
         let start = size_of::<Header>();
         let end = start + tf!(self.lo_len);
         &self.as_ref()[start..end]
@@ -2324,7 +2324,7 @@ impl Inner {
         &mut self.as_mut()[start..end]
     }
 
-    pub(crate) fn hi(&self) -> Option<&[u8]> {
+    pub fn hi(&self) -> Option<&[u8]> {
         let start = tf!(self.lo_len) + size_of::<Header>();
         let end = start + tf!(self.hi_len);
         if start == end {
